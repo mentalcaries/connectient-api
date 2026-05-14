@@ -10,7 +10,7 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 
-	"connectient-api/internal/database"
+	"github.com/mentalcaries/connectient-api/internal/database"
 )
 
 type Server struct {

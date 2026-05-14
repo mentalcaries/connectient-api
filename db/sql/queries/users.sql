@@ -1,39 +1,43 @@
 -- name: CreateUser :one
 INSERT INTO users (
+    id,
     first_name,
-    last_name, 
+    last_name,
     email,
     mobile_phone,
     practice_id
 ) VALUES (
+    sqlc.arg(id),
     sqlc.arg(first_name),
     sqlc.arg(last_name),
-    sqlc.arg(email),
-    sqlc.arg(mobile_phone),
+    sqlc.narg(email),
+    sqlc.narg(mobile_phone),
     sqlc.arg(practice_id)
 )
-RETURNING *; 
+RETURNING *;
 
 -- name: GetAllUsers :many
 SELECT * FROM users;
 
 -- name: GetUser :one
-
-SELECT * from users WHERE ID = sqlc.arg(id);
+SELECT * FROM users WHERE id = sqlc.arg(id);
 
 -- name: UpdateUser :one
-
 UPDATE users
 SET
-    first_name =COALESCE(sqlc.narg(first_name), first_name),
-    last_name =COALESCE(sqlc.narg(last_name), last_name),
-    email =COALESCE(sqlc.narg(email), email),
-    mobile_phone =COALESCE(sqlc.narg(mobile_phone), mobile_phone),
+    first_name = COALESCE(sqlc.narg(first_name), first_name),
+    last_name = COALESCE(sqlc.narg(last_name), last_name),
+    email = COALESCE(sqlc.narg(email), email),
+    mobile_phone = COALESCE(sqlc.narg(mobile_phone), mobile_phone),
     role = COALESCE(sqlc.narg(role), role),
+    org_role = COALESCE(sqlc.narg(org_role), org_role),
     is_active = COALESCE(sqlc.narg(is_active), is_active),
-    avatar_url = COALESCE(sqlc.narg(avatar_url), avatar_url)
+    avatar_url = COALESCE(sqlc.narg(avatar_url), avatar_url),
+    whatsapp_notifications_enabled = COALESCE(sqlc.narg(whatsapp_notifications_enabled), whatsapp_notifications_enabled),
+    terms_agreed_at = COALESCE(sqlc.narg(terms_agreed_at), terms_agreed_at),
+    modified_at = NOW()
 WHERE id = sqlc.arg(id)
-RETURNING *; 
+RETURNING *;
 
 -- name: DeleteUser :one
 UPDATE users

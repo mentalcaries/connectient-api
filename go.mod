@@ -1,4 +1,4 @@
-module connectient-api
+module github.com/mentalcaries/connectient-api
 
 go 1.25.1
 

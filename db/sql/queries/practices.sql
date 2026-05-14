@@ -3,23 +3,27 @@ SELECT * FROM practices;
 
 -- name: GetPractice :one
 SELECT * FROM practices
-WHERE ID = sqlc.arg(id);
+WHERE id = sqlc.arg(id);
 
 -- name: CreatePractice :one
-INSERT INTO practices (name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website)
+INSERT INTO practices (name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category)
 VALUES (
     sqlc.arg(name),
     sqlc.arg(city),
-    sqlc.arg(phone),
-    sqlc.arg(email),
-    sqlc.narg(practice_code),
+    sqlc.narg(phone),
+    sqlc.narg(email),
+    sqlc.arg(practice_code),
     sqlc.narg(logo),
     sqlc.narg(street_address),
     sqlc.narg(facebook),
     sqlc.narg(instagram),
-    sqlc.narg(website)
+    sqlc.narg(website),
+    sqlc.arg(has_multiple_providers),
+    sqlc.narg(specialty),
+    sqlc.arg(is_suspended),
+    sqlc.arg(practice_category)
 )
-RETURNING *; 
+RETURNING *;
 
 -- name: UpdatePractice :one
 UPDATE practices
@@ -34,6 +38,10 @@ SET
     facebook = COALESCE(sqlc.narg(facebook), facebook),
     instagram = COALESCE(sqlc.narg(instagram), instagram),
     website = COALESCE(sqlc.narg(website), website),
+    has_multiple_providers = COALESCE(sqlc.narg(has_multiple_providers), has_multiple_providers),
+    specialty = COALESCE(sqlc.narg(specialty), specialty),
+    is_suspended = COALESCE(sqlc.narg(is_suspended), is_suspended),
+    practice_category = COALESCE(sqlc.narg(practice_category), practice_category),
     is_active = COALESCE(sqlc.narg(is_active), is_active),
     modified_at = NOW()
 WHERE id = sqlc.arg(id)

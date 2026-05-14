@@ -8,20 +8,20 @@ import (
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
-	r := gin.Default()
+	router := gin.Default()
 
-	r.Use(cors.New(cors.Config{
+	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"}, // Add your frontend URL
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true, // Enable cookies/auth
 	}))
 
-	r.GET("/", s.HelloWorldHandler)
+	router.GET("/", s.HelloWorldHandler)
 
-	r.GET("/health", s.healthHandler)
+	router.GET("/health", s.healthHandler)
 
-	return r
+	return router
 }
 
 func (s *Server) HelloWorldHandler(c *gin.Context) {
