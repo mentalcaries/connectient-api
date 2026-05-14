@@ -14,21 +14,25 @@ import (
 )
 
 type Server struct {
-	port int
-	db   database.Service
+	port    int
+	db      database.Service
+	DBQuery *database.Queries
 }
 
 func NewServer() *http.Server {
 	port, err := strconv.Atoi(os.Getenv("PORT"))
 	if err != nil {
-		log.Fatalf("invalid PORT value %q: %v", port, err)
-	}
-	AppServer := &Server{
-		port: port,
-		db:   database.New(),
+		log.Fatalf("invalid PORT value %q: %v", os.Getenv("PORT"), err)
 	}
 
-	// Declare Server config
+	db := database.NewDb()
+
+	AppServer := &Server{
+		port:    port,
+		db:      db,
+		DBQuery: database.New(db.Pool()),
+	}
+
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", AppServer.port),
 		Handler:      AppServer.RegisterRoutes(),

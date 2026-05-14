@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"connectient-api/internal/server"
+	"github.com/mentalcaries/connectient-api/internal/server"
 )
 
 func gracefulShutdown(apiServer *http.Server, done chan bool) {

@@ -17,18 +17,17 @@ func (s *Server) RegisterRoutes() http.Handler {
 		AllowCredentials: true, // Enable cookies/auth
 	}))
 
-	router.GET("/", s.HelloWorldHandler)
-
+	router.GET("/", s.handleReadiness)
 	router.GET("/health", s.healthHandler)
+
+	router.GET("/appointments", s.handlerAppointmentsGetAll)
 
 	return router
 }
 
-func (s *Server) HelloWorldHandler(c *gin.Context) {
-	resp := make(map[string]string)
-	resp["message"] = "Hello World"
+func (s *Server) handleReadiness(c *gin.Context) {
 
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{"message": "Connectient up"})
 }
 
 func (s *Server) healthHandler(c *gin.Context) {

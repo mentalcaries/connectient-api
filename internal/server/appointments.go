@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	db "github.com/mentalcaries/connectient-api/internal/database"
 )
@@ -55,10 +56,10 @@ type UpdateAppointmentRequest struct {
 	IsCancelled   bool       `json:"is_cancelled,omitempty"`
 }
 
-func (s *Server) handlerAppointmentsGetAll(w http.ResponseWriter, r *http.Request) {
-	dbAppts, err := s.db.GetAppointments(r.Context())
+func (s *Server) handlerAppointmentsGetAll(c *gin.Context) {
+	dbAppts, err := s.DBQuery.GetAppointments(c)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Could not get Appointments", err)
+		respondWithError(c, http.StatusInternalServerError, "Could not get Appointments", err)
 		return
 	}
 	appointments := []Appointment{}
@@ -66,174 +67,173 @@ func (s *Server) handlerAppointmentsGetAll(w http.ResponseWriter, r *http.Reques
 	for _, dbAppt := range dbAppts {
 		appointments = append(appointments, Appointment{
 			ID:              dbAppt.ID,
-			CreatedAt:       dbAppt.CreatedAt,
-			ModifiedAt:      dbAppt.ModifiedAt,
+			CreatedAt:       *dbAppt.CreatedAt,
+			ModifiedAt:      *dbAppt.ModifiedAt,
 			Email:           dbAppt.Email,
 			FirstName:       dbAppt.FirstName,
 			LastName:        dbAppt.LastName,
 			MobilePhone:     dbAppt.MobilePhone,
-			RequestedDate:   dbAppt.RequestedDate,
-			IsEmergency:     dbAppt.IsEmergency,
+			RequestedDate:   *dbAppt.RequestedDate,
+			IsEmergency:     *dbAppt.IsEmergency,
 			Description:     *dbAppt.Description,
 			AppointmentType: *dbAppt.AppointmentType,
-			IsScheduled:     dbAppt.IsScheduled,
+			IsScheduled:     *dbAppt.IsScheduled,
 			ScheduledDate:   dbAppt.ScheduledDate,
 			CreatedBy:       dbAppt.CreatedBy,
 			ScheduledBy:     dbAppt.ScheduledBy,
-			IsCancelled:     dbAppt.IsCancelled,
-			RequestedTime:   dbAppt.RequestedTime,
+			IsCancelled:     *dbAppt.IsCancelled,
+			RequestedTime:   *dbAppt.RequestedTime,
 			ScheduledTime:   dbAppt.ScheduledTime,
-			PracticeID:      dbAppt.PracticeID,
+			PracticeID:      *dbAppt.PracticeID,
 			Token:           dbAppt.Token,
 		})
 	}
-	respondWithJSON(w, http.StatusOK, appointments)
+	c.JSON(http.StatusOK, appointments)
 }
 
-func (s *Server) handlerGetAppointmentById(w http.ResponseWriter, r *http.Request) {
-	id, err := parseId(r, "id")
+func (s *Server) handlerGetAppointmentById(c *gin.Context) {
+	id, err := parseId(c, "id")
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid or missing ID", err)
+		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
 		return
 	}
 
-	dbAppt, err := s.DB.GetAppointmentById(r.Context(), id)
+	dbAppt, err := s.DBQuery.GetAppointmentById(c, id)
 	if err != nil || err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "No appointments found", err)
+		respondWithError(c, http.StatusNotFound, "No appointments found", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, Appointment{
+	c.JSON(http.StatusOK, Appointment{
 		ID:              dbAppt.ID,
-		CreatedAt:       dbAppt.CreatedAt,
-		ModifiedAt:      dbAppt.ModifiedAt,
+		CreatedAt:       *dbAppt.CreatedAt,
+		ModifiedAt:      *dbAppt.ModifiedAt,
 		Email:           dbAppt.Email,
 		FirstName:       dbAppt.FirstName,
 		LastName:        dbAppt.LastName,
 		MobilePhone:     dbAppt.MobilePhone,
-		RequestedDate:   dbAppt.RequestedDate,
-		IsEmergency:     dbAppt.IsEmergency,
+		RequestedDate:   *dbAppt.RequestedDate,
+		IsEmergency:     *dbAppt.IsEmergency,
 		Description:     *dbAppt.Description,
 		AppointmentType: *dbAppt.AppointmentType,
-		IsScheduled:     dbAppt.IsScheduled,
+		IsScheduled:     *dbAppt.IsScheduled,
 		ScheduledDate:   dbAppt.ScheduledDate,
 		CreatedBy:       dbAppt.CreatedBy,
 		ScheduledBy:     dbAppt.ScheduledBy,
-		IsCancelled:     dbAppt.IsCancelled,
-		RequestedTime:   dbAppt.RequestedTime,
+		IsCancelled:     *dbAppt.IsCancelled,
+		RequestedTime:   *dbAppt.RequestedTime,
 		ScheduledTime:   dbAppt.ScheduledTime,
-		PracticeID:      dbAppt.PracticeID,
+		PracticeID:      *dbAppt.PracticeID,
 		Token:           dbAppt.Token,
 	})
 }
 
-func (s *Server) handlerAppointmentsCreate(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
+func (s *Server) handlerAppointmentsCreate(c *gin.Context) {
+	decoder := json.NewDecoder(c.Request.Body)
 	params := NewAppointmentRequest{}
 
 	err := decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request", err)
+		respondWithError(c, http.StatusBadRequest, "Invalid request", err)
 		return
 	}
 
-	apptToken := auth.MakeToken()
-	fmt.Println(apptToken)
+	apptToken := MakeToken()
 
-	appointment, err := s.DB.CreateAppointment(r.Context(), db.CreateAppointmentParams{
+	appointment, err := s.DBQuery.CreateAppointment(c, db.CreateAppointmentParams{
 		FirstName:       params.FirstName,
 		LastName:        params.LastName,
 		MobilePhone:     params.MobilePhone,
 		Email:           params.Email,
-		RequestedDate:   params.RequestedDate,
-		RequestedTime:   params.RequestedTime,
+		RequestedDate:   &params.RequestedDate,
+		RequestedTime:   &params.RequestedTime,
 		AppointmentType: params.AppointmentType,
 		Description:     params.Description,
-		IsEmergency:     params.IsEmergency,
-		PracticeID:      params.PracticeID,
+		IsEmergency:     &params.IsEmergency,
+		PracticeID:      &params.PracticeID,
 		Token:           apptToken,
 	})
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Could not save to database", err)
+		respondWithError(c, http.StatusInternalServerError, "Could not save to database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusCreated, Appointment{
+	c.JSON(http.StatusCreated, Appointment{
 		ID:              appointment.ID,
-		CreatedAt:       appointment.CreatedAt,
-		ModifiedAt:      appointment.ModifiedAt,
+		CreatedAt:       *appointment.CreatedAt,
+		ModifiedAt:      *appointment.ModifiedAt,
 		FirstName:       appointment.FirstName,
 		LastName:        appointment.LastName,
 		MobilePhone:     appointment.MobilePhone,
 		Email:           appointment.Email,
-		RequestedDate:   appointment.RequestedDate,
-		RequestedTime:   appointment.RequestedTime,
+		RequestedDate:   *appointment.RequestedDate,
+		RequestedTime:   *appointment.RequestedTime,
 		AppointmentType: *appointment.AppointmentType,
 		Description:     *appointment.Description,
-		IsEmergency:     appointment.IsEmergency,
-		PracticeID:      appointment.PracticeID,
+		IsEmergency:     *appointment.IsEmergency,
+		PracticeID:      *appointment.PracticeID,
 		Token:           appointment.Token,
 	})
 }
 
-func (s *Server) handlerAppointmentsUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := parseId(r, "id")
+func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
+	id, err := parseId(c, "id")
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid or missing ID", err)
+		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
 		return
 	}
-	decoder := json.NewDecoder(r.Body)
-	params := UpdateAppointmentRequest{}
-	err = decoder.Decode(&params)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Could not decode request", err)
+
+var req UpdateAppointmentRequest
+
+	if err = c.ShouldBindJSON(&req); err != nil {
+		respondWithError(c, http.StatusBadRequest, "Could not decode request", err)
 		return
 	}
-	updatedAppt, err := s.DB.UpdateAppointment(r.Context(), db.UpdateAppointmentParams{
+	updatedAppt, err := s.DBQuery.UpdateAppointment(c, db.UpdateAppointmentParams{
 		ID:            id,
-		ScheduledDate: params.ScheduledDate,
-		ScheduledTime: params.ScheduledTime,
-		IsScheduled:   &params.IsScheduled,
-		IsCancelled:   &params.IsCancelled,
+		ScheduledDate: req.ScheduledDate,
+		ScheduledTime: req.ScheduledTime,
+		IsScheduled:   &req.IsScheduled,
+		IsCancelled:   &req.IsCancelled,
 	})
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Could not update appointment", err)
+		respondWithError(c, http.StatusInternalServerError, "Could not update appointment", err)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, Appointment{
+	c.JSON(http.StatusOK, Appointment{
 		ID:              updatedAppt.ID,
-		CreatedAt:       updatedAppt.CreatedAt,
-		ModifiedAt:      updatedAppt.ModifiedAt,
+		CreatedAt:       *updatedAppt.CreatedAt,
+		ModifiedAt:      *updatedAppt.ModifiedAt,
 		FirstName:       updatedAppt.FirstName,
 		LastName:        updatedAppt.LastName,
 		MobilePhone:     updatedAppt.MobilePhone,
 		Email:           updatedAppt.Email,
-		RequestedDate:   updatedAppt.RequestedDate,
-		RequestedTime:   updatedAppt.RequestedTime,
+		RequestedDate:   *updatedAppt.RequestedDate,
+		RequestedTime:   *updatedAppt.RequestedTime,
 		AppointmentType: *updatedAppt.AppointmentType,
 		Description:     *updatedAppt.Description,
-		IsEmergency:     updatedAppt.IsEmergency,
-		PracticeID:      updatedAppt.PracticeID,
-		IsScheduled:     updatedAppt.IsScheduled,
-		IsCancelled:     updatedAppt.IsCancelled,
+		IsEmergency:     *updatedAppt.IsEmergency,
+		PracticeID:      *updatedAppt.PracticeID,
+		IsScheduled:     *updatedAppt.IsScheduled,
+		IsCancelled:     *updatedAppt.IsCancelled,
 		ScheduledDate:   updatedAppt.ScheduledDate,
 		ScheduledTime:   updatedAppt.ScheduledTime,
 	})
 }
 
-func (s *Server) handlerAppointmentsDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := parseId(r, "id")
+func (s *Server) handlerAppointmentsDelete(c *gin.Context) {
+	id, err := parseId(c, "id")
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid or missing ID", err)
+		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
 		return
 	}
 
-	deletedAppt, err := s.DB.DeleteAppointment(r.Context(), id)
+	deletedAppt, err := s.DBQuery.DeleteAppointment(c, id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Could not delete appointment", err)
+		respondWithError(c, http.StatusInternalServerError, "Could not delete appointment", err)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, fmt.Sprintf("Successfully deleted appointment with id: %v", deletedAppt))
+	c.JSON(http.StatusOK, fmt.Sprintf("Successfully deleted appointment with id: %v", deletedAppt))
 }
