@@ -2,7 +2,9 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -33,10 +35,6 @@ func mustStartPostgresContainer() (func(context.Context, ...testcontainers.Termi
 		return nil, err
 	}
 
-	database = dbName
-	password = dbPwd
-	username = dbUser
-
 	dbHost, err := dbContainer.Host(context.Background())
 	if err != nil {
 		return dbContainer.Terminate, err
@@ -47,8 +45,7 @@ func mustStartPostgresContainer() (func(context.Context, ...testcontainers.Termi
 		return dbContainer.Terminate, err
 	}
 
-	host = dbHost
-	port = dbPort.Port()
+	os.Setenv("DATABASE_URL", fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", dbUser, dbPwd, dbHost, dbPort.Port(), dbName))
 
 	return dbContainer.Terminate, err
 }
@@ -78,16 +75,16 @@ func TestHealth(t *testing.T) {
 
 	stats := srv.Health()
 
-	if stats["status"] != "up" {
-		t.Fatalf("expected status to be up, got %s", stats["status"])
+	if stats.Status != "up" {
+		t.Fatalf("expected status to be up, got %s", stats.Status)
 	}
 
-	if _, ok := stats["error"]; ok {
+	if stats.Error != "" {
 		t.Fatalf("expected error not to be present")
 	}
 
-	if stats["message"] != "It's healthy" {
-		t.Fatalf("expected message to be 'It's healthy', got %s", stats["message"])
+	if stats.Message != "It's healthy" {
+		t.Fatalf("expected message to be 'It's healthy', got %s", stats.Message)
 	}
 }
 

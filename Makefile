@@ -1,4 +1,5 @@
-# Simple Makefile for a Go project
+include .env
+export
 
 # Build the application
 all: build test
@@ -12,6 +13,11 @@ build:
 # Run the application
 run:
 	@go run cmd/api/main.go
+
+# Create the DB migrations
+migrate-up:
+	goose -dir db/sql/schema postgres $(DATABASE_URL) up
+
 # Create DB container
 docker-run:
 	@if docker compose up --build 2>/dev/null; then \
