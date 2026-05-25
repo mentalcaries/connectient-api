@@ -58,7 +58,7 @@ INSERT INTO appointments (
     $20,
     $21
 )
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at
 `
 
 type CreateAppointmentParams struct {
@@ -135,6 +135,7 @@ func (q *Queries) CreateAppointment(ctx context.Context, arg CreateAppointmentPa
 		&i.LocationID,
 		&i.PatientID,
 		&i.Token,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -152,7 +153,7 @@ func (q *Queries) DeleteAppointment(ctx context.Context, id uuid.UUID) (uuid.UUI
 }
 
 const getAppointmentById = `-- name: GetAppointmentById :one
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token FROM appointments WHERE id = $1
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at FROM appointments WHERE id = $1
 `
 
 func (q *Queries) GetAppointmentById(ctx context.Context, id uuid.UUID) (Appointment, error) {
@@ -183,12 +184,13 @@ func (q *Queries) GetAppointmentById(ctx context.Context, id uuid.UUID) (Appoint
 		&i.LocationID,
 		&i.PatientID,
 		&i.Token,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getAppointments = `-- name: GetAppointments :many
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token FROM appointments
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at FROM appointments
 `
 
 func (q *Queries) GetAppointments(ctx context.Context) ([]Appointment, error) {
@@ -225,6 +227,7 @@ func (q *Queries) GetAppointments(ctx context.Context) ([]Appointment, error) {
 			&i.LocationID,
 			&i.PatientID,
 			&i.Token,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -247,7 +250,7 @@ SET
     appointment_type = COALESCE($6, appointment_type),
     modified_at = NOW()
 WHERE token = $7
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at
 `
 
 type ManageAppointmentByTokenParams struct {
@@ -296,6 +299,57 @@ func (q *Queries) ManageAppointmentByToken(ctx context.Context, arg ManageAppoin
 		&i.LocationID,
 		&i.PatientID,
 		&i.Token,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const softDeleteAppointment = `-- name: SoftDeleteAppointment :one
+UPDATE appointments
+SET
+    deleted_at = NOW()
+WHERE id = $1
+    AND practice_id = $2
+    AND is_scheduled = false
+    AND is_cancelled = false
+    AND deleted_at IS NULL
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at
+`
+
+type SoftDeleteAppointmentParams struct {
+	ID         uuid.UUID
+	PracticeID *uuid.UUID
+}
+
+func (q *Queries) SoftDeleteAppointment(ctx context.Context, arg SoftDeleteAppointmentParams) (Appointment, error) {
+	row := q.db.QueryRow(ctx, softDeleteAppointment, arg.ID, arg.PracticeID)
+	var i Appointment
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.MobilePhone,
+		&i.RequestedDate,
+		&i.RequestedTime,
+		&i.IsEmergency,
+		&i.Description,
+		&i.AppointmentType,
+		&i.IsScheduled,
+		&i.ScheduledDate,
+		&i.ScheduledTime,
+		&i.IsCancelled,
+		&i.DurationMinutes,
+		&i.CreatedBy,
+		&i.ScheduledBy,
+		&i.PracticeID,
+		&i.ProviderID,
+		&i.LocationID,
+		&i.PatientID,
+		&i.Token,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -312,7 +366,9 @@ SET
     duration_minutes = COALESCE($7, duration_minutes),
     modified_at = NOW()
 WHERE id = $8
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token
+    AND practice_id = $9
+    AND deleted_at IS NULL
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at
 `
 
 type UpdateAppointmentParams struct {
@@ -324,6 +380,7 @@ type UpdateAppointmentParams struct {
 	LocationID      *uuid.UUID
 	DurationMinutes *int32
 	ID              uuid.UUID
+	PracticeID      *uuid.UUID
 }
 
 func (q *Queries) UpdateAppointment(ctx context.Context, arg UpdateAppointmentParams) (Appointment, error) {
@@ -336,6 +393,7 @@ func (q *Queries) UpdateAppointment(ctx context.Context, arg UpdateAppointmentPa
 		arg.LocationID,
 		arg.DurationMinutes,
 		arg.ID,
+		arg.PracticeID,
 	)
 	var i Appointment
 	err := row.Scan(
@@ -363,6 +421,7 @@ func (q *Queries) UpdateAppointment(ctx context.Context, arg UpdateAppointmentPa
 		&i.LocationID,
 		&i.PatientID,
 		&i.Token,
+		&i.DeletedAt,
 	)
 	return i, err
 }

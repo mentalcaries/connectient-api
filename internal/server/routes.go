@@ -21,6 +21,10 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router.GET("/health", s.healthHandler)
 
 	router.GET("/appointments", s.handlerAppointmentsGetAll)
+	router.GET("appointments/:id", s.handlerGetAppointmentById)
+	router.POST("/appointments", s.handlerAppointmentsCreate)
+	router.PATCH("/appointments", s.handlerAppointmentsUpdate)
+	router.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
 
 	return router
 }

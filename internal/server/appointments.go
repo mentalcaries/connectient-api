@@ -42,8 +42,8 @@ type NewAppointmentRequest struct {
 	MobilePhone     string    `json:"mobile_phone"`
 	RequestedDate   time.Time `json:"requested_date"`
 	IsEmergency     bool      `json:"is_emergency"`
-	Description     *string   `json:"description"`
-	AppointmentType *string   `json:"appointment_type"`
+	Description     string    `json:"description,omitempty"`
+	AppointmentType string    `json:"appointment_type,omitempty"`
 	RequestedTime   string    `json:"requested_time"`
 	PracticeID      uuid.UUID `json:"practice_id"`
 }
@@ -146,8 +146,8 @@ func (s *Server) handlerAppointmentsCreate(c *gin.Context) {
 		Email:           params.Email,
 		RequestedDate:   &params.RequestedDate,
 		RequestedTime:   &params.RequestedTime,
-		AppointmentType: params.AppointmentType,
-		Description:     params.Description,
+		AppointmentType: &params.AppointmentType,
+		Description:     &params.Description,
 		IsEmergency:     &params.IsEmergency,
 		PracticeID:      &params.PracticeID,
 		Token:           apptToken,
@@ -182,7 +182,7 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 		return
 	}
 
-var req UpdateAppointmentRequest
+	var req UpdateAppointmentRequest
 
 	if err = c.ShouldBindJSON(&req); err != nil {
 		respondWithError(c, http.StatusBadRequest, "Could not decode request", err)

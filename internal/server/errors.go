@@ -6,9 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type errorResponse struct {
-	Error string `json:"error"`
-}
 
 func respondWithError(c *gin.Context, code int, message string, err error) {
 	if err != nil {

@@ -64,8 +64,20 @@ SET
     duration_minutes = COALESCE(sqlc.narg(duration_minutes), duration_minutes),
     modified_at = NOW()
 WHERE id = sqlc.arg(id)
+    AND practice_id = sqlc.arg(practice_id)
+    AND deleted_at IS NULL
 RETURNING *;
 
+-- name: SoftDeleteAppointment :one
+UPDATE appointments
+SET
+    deleted_at = NOW()
+WHERE id = sqlc.arg(id)
+    AND practice_id = sqlc.arg(practice_id)
+    AND is_scheduled = false
+    AND is_cancelled = false
+    AND deleted_at IS NULL
+RETURNING *;
 -- name: ManageAppointmentByToken :one
 UPDATE appointments
 SET

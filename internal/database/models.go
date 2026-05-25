@@ -35,6 +35,7 @@ type Appointment struct {
 	LocationID      *uuid.UUID
 	PatientID       *uuid.UUID
 	Token           string
+	DeletedAt       *time.Time
 }
 
 type AppointmentCalendarEvent struct {
