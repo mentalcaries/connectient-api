@@ -22,14 +22,14 @@ type Appointment struct {
 	MobilePhone     string     `json:"mobile_phone"`
 	RequestedDate   time.Time  `json:"requested_date"`
 	IsEmergency     bool       `json:"is_emergency"`
-	Description     string     `json:"description,omitempty"`
-	AppointmentType string     `json:"appointment_type"`
-	IsScheduled     bool       `json:"is_scheduled"`
+	Description     *string    `json:"description,omitempty"`
+	AppointmentType *string    `json:"appointment_type"`
+	IsScheduled     *bool      `json:"is_scheduled"`
 	ScheduledDate   *time.Time `json:"scheduled_date,omitempty"`
 	ScheduledTime   *string    `json:"scheduled_time,omitempty"`
 	CreatedBy       *uuid.UUID `json:"created_by,omitempty"`
 	ScheduledBy     *uuid.UUID `json:"scheduled_by,omitempty"`
-	IsCancelled     bool       `json:"is_cancelled"`
+	IsCancelled     *bool       `json:"is_cancelled"`
 	RequestedTime   string     `json:"requested_time"`
 	PracticeID      uuid.UUID  `json:"practice_id"`
 	Token           string     `json:"token"`
@@ -75,13 +75,13 @@ func (s *Server) handlerAppointmentsGetAll(c *gin.Context) {
 			MobilePhone:     dbAppt.MobilePhone,
 			RequestedDate:   *dbAppt.RequestedDate,
 			IsEmergency:     *dbAppt.IsEmergency,
-			Description:     *dbAppt.Description,
-			AppointmentType: *dbAppt.AppointmentType,
-			IsScheduled:     *dbAppt.IsScheduled,
+			Description:     dbAppt.Description,
+			AppointmentType: dbAppt.AppointmentType,
+			IsScheduled:     dbAppt.IsScheduled,
 			ScheduledDate:   dbAppt.ScheduledDate,
 			CreatedBy:       dbAppt.CreatedBy,
 			ScheduledBy:     dbAppt.ScheduledBy,
-			IsCancelled:     *dbAppt.IsCancelled,
+			IsCancelled:     dbAppt.IsCancelled,
 			RequestedTime:   *dbAppt.RequestedTime,
 			ScheduledTime:   dbAppt.ScheduledTime,
 			PracticeID:      *dbAppt.PracticeID,
@@ -113,13 +113,13 @@ func (s *Server) handlerGetAppointmentById(c *gin.Context) {
 		MobilePhone:     dbAppt.MobilePhone,
 		RequestedDate:   *dbAppt.RequestedDate,
 		IsEmergency:     *dbAppt.IsEmergency,
-		Description:     *dbAppt.Description,
-		AppointmentType: *dbAppt.AppointmentType,
-		IsScheduled:     *dbAppt.IsScheduled,
+		Description:     dbAppt.Description,
+		AppointmentType: dbAppt.AppointmentType,
+		IsScheduled:     dbAppt.IsScheduled,
 		ScheduledDate:   dbAppt.ScheduledDate,
 		CreatedBy:       dbAppt.CreatedBy,
 		ScheduledBy:     dbAppt.ScheduledBy,
-		IsCancelled:     *dbAppt.IsCancelled,
+		IsCancelled:     dbAppt.IsCancelled,
 		RequestedTime:   *dbAppt.RequestedTime,
 		ScheduledTime:   dbAppt.ScheduledTime,
 		PracticeID:      *dbAppt.PracticeID,
@@ -167,8 +167,8 @@ func (s *Server) handlerAppointmentsCreate(c *gin.Context) {
 		Email:           appointment.Email,
 		RequestedDate:   *appointment.RequestedDate,
 		RequestedTime:   *appointment.RequestedTime,
-		AppointmentType: *appointment.AppointmentType,
-		Description:     *appointment.Description,
+		AppointmentType: appointment.AppointmentType,
+		Description:     appointment.Description,
 		IsEmergency:     *appointment.IsEmergency,
 		PracticeID:      *appointment.PracticeID,
 		Token:           appointment.Token,
@@ -211,12 +211,12 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 		Email:           updatedAppt.Email,
 		RequestedDate:   *updatedAppt.RequestedDate,
 		RequestedTime:   *updatedAppt.RequestedTime,
-		AppointmentType: *updatedAppt.AppointmentType,
-		Description:     *updatedAppt.Description,
+		AppointmentType: updatedAppt.AppointmentType,
+		Description:     updatedAppt.Description,
 		IsEmergency:     *updatedAppt.IsEmergency,
 		PracticeID:      *updatedAppt.PracticeID,
-		IsScheduled:     *updatedAppt.IsScheduled,
-		IsCancelled:     *updatedAppt.IsCancelled,
+		IsScheduled:     updatedAppt.IsScheduled,
+		IsCancelled:     updatedAppt.IsCancelled,
 		ScheduledDate:   updatedAppt.ScheduledDate,
 		ScheduledTime:   updatedAppt.ScheduledTime,
 	})
