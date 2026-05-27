@@ -27,6 +27,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
 
 	router.GET("/register/suggest-code", s.handlerSuggestPracticeCode)
+	router.GET("/register/check-code", s.handlerCheckCodeAvailability)
 	
 
 	return router
