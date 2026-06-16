@@ -20,6 +20,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router.GET("/", s.handleReadiness)
 	router.GET("/health", s.healthHandler)
 
+	router.POST("/users", s.handlerUserCreate)
+
 	router.GET("/appointments", s.handlerAppointmentsGetAll)
 	router.GET("appointments/:id", s.handlerGetAppointmentById)
 	router.POST("/appointments", s.handlerAppointmentsCreate)

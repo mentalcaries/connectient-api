@@ -12,25 +12,25 @@ import (
 
 type Appointment struct {
 	ID              uuid.UUID
-	CreatedAt       *time.Time
-	ModifiedAt      *time.Time
+	CreatedAt       time.Time
+	ModifiedAt      time.Time
 	FirstName       string
 	LastName        string
 	Email           string
 	MobilePhone     string
-	RequestedDate   *time.Time
-	RequestedTime   *string
-	IsEmergency     *bool
+	RequestedDate   time.Time
+	RequestedTime   string
+	IsEmergency     bool
 	Description     *string
-	AppointmentType *string
-	IsScheduled     *bool
+	AppointmentType string
+	IsScheduled     bool
 	ScheduledDate   *time.Time
 	ScheduledTime   *string
-	IsCancelled     *bool
+	IsCancelled     bool
 	DurationMinutes *int32
 	CreatedBy       *uuid.UUID
 	ScheduledBy     *uuid.UUID
-	PracticeID      *uuid.UUID
+	PracticeID      uuid.UUID
 	ProviderID      *uuid.UUID
 	LocationID      *uuid.UUID
 	PatientID       *uuid.UUID

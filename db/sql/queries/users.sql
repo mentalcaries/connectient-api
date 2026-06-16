@@ -5,14 +5,16 @@ INSERT INTO users (
     last_name,
     email,
     mobile_phone,
-    practice_id
+    role,
+    terms_agreed_at
 ) VALUES (
     sqlc.arg(id),
     sqlc.arg(first_name),
     sqlc.arg(last_name),
-    sqlc.narg(email),
-    sqlc.narg(mobile_phone),
-    sqlc.arg(practice_id)
+    sqlc.arg(email),
+    sqlc.arg(mobile_phone),
+    sqlc.arg(role),
+    sqlc.arg(terms_agreed_at)
 )
 RETURNING *;
 

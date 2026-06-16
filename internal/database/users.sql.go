@@ -19,25 +19,28 @@ INSERT INTO users (
     last_name,
     email,
     mobile_phone,
-    practice_id
+    role,
+    terms_agreed_at
 ) VALUES (
     $1,
     $2,
     $3,
     $4,
     $5,
-    $6
+    $6,
+    $7
 )
 RETURNING id, created_at, modified_at, first_name, last_name, mobile_phone, email, practice_id, role, org_role, is_active, invited_by, avatar_url, whatsapp_notifications_enabled, terms_agreed_at, deleted_at
 `
 
 type CreateUserParams struct {
-	ID          uuid.UUID
-	FirstName   string
-	LastName    string
-	Email       *string
-	MobilePhone *string
-	PracticeID  *uuid.UUID
+	ID            uuid.UUID
+	FirstName     string
+	LastName      string
+	Email         *string
+	MobilePhone   *string
+	Role          *string
+	TermsAgreedAt *time.Time
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -47,7 +50,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.LastName,
 		arg.Email,
 		arg.MobilePhone,
-		arg.PracticeID,
+		arg.Role,
+		arg.TermsAgreedAt,
 	)
 	var i User
 	err := row.Scan(

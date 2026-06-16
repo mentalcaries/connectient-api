@@ -9,7 +9,7 @@ CREATE TABLE appointments (
     mobile_phone VARCHAR NOT NULL,
     requested_date DATE NOT NULL,
     requested_time TEXT NOT NULL DEFAULT '',
-    is_emergency BOOLEAN DEFAULT NOT NULL FALSE,
+    is_emergency BOOLEAN NOT NULL DEFAULT FALSE,
     description TEXT,
     appointment_type TEXT NOT NULL DEFAULT 'consultation',
     is_scheduled BOOLEAN NOT NULL DEFAULT FALSE,

@@ -67,14 +67,14 @@ type CreateAppointmentParams struct {
 	Email           string
 	MobilePhone     string
 	RequestedDate   *time.Time
-	RequestedTime   *string
-	IsEmergency     *bool
+	RequestedTime   string
+	IsEmergency     bool
 	Description     *string
 	AppointmentType *string
-	IsScheduled     *bool
+	IsScheduled     bool
 	ScheduledDate   *time.Time
 	ScheduledTime   *string
-	IsCancelled     *bool
+	IsCancelled     bool
 	DurationMinutes *int32
 	CreatedBy       *uuid.UUID
 	ScheduledBy     *uuid.UUID
@@ -318,7 +318,7 @@ RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phon
 
 type SoftDeleteAppointmentParams struct {
 	ID         uuid.UUID
-	PracticeID *uuid.UUID
+	PracticeID uuid.UUID
 }
 
 func (q *Queries) SoftDeleteAppointment(ctx context.Context, arg SoftDeleteAppointmentParams) (Appointment, error) {
@@ -380,7 +380,7 @@ type UpdateAppointmentParams struct {
 	LocationID      *uuid.UUID
 	DurationMinutes *int32
 	ID              uuid.UUID
-	PracticeID      *uuid.UUID
+	PracticeID      uuid.UUID
 }
 
 func (q *Queries) UpdateAppointment(ctx context.Context, arg UpdateAppointmentParams) (Appointment, error) {
