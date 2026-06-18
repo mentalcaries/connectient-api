@@ -121,6 +121,37 @@ func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (Practice, erro
 	return i, err
 }
 
+const getPracticeByCode = `-- name: GetPracticeByCode :one
+SELECT id, created_at, modified_at, name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category, is_active FROM practices
+WHERE practice_code = $1
+`
+
+func (q *Queries) GetPracticeByCode(ctx context.Context, practiceCode string) (Practice, error) {
+	row := q.db.QueryRow(ctx, getPracticeByCode, practiceCode)
+	var i Practice
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.Name,
+		&i.City,
+		&i.Phone,
+		&i.Email,
+		&i.PracticeCode,
+		&i.Logo,
+		&i.StreetAddress,
+		&i.Facebook,
+		&i.Instagram,
+		&i.Website,
+		&i.HasMultipleProviders,
+		&i.Specialty,
+		&i.IsSuspended,
+		&i.PracticeCategory,
+		&i.IsActive,
+	)
+	return i, err
+}
+
 const getPractices = `-- name: GetPractices :many
 SELECT id, created_at, modified_at, name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category, is_active FROM practices
 `

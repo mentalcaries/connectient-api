@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Appointment struct {
@@ -205,6 +206,26 @@ type Provider struct {
 	LastName  string
 	Title     *string
 	Specialty string
+}
+
+type Subscription struct {
+	ID                   uuid.UUID
+	Plan                 string
+	ReferenceId          string
+	StripeCustomerId     *string
+	StripeSubscriptionId *string
+	Status               string
+	PeriodStart          pgtype.Timestamptz
+	PeriodEnd            pgtype.Timestamptz
+	TrialStart           pgtype.Timestamptz
+	TrialEnd             pgtype.Timestamptz
+	CancelAtPeriodEnd    *bool
+	CancelAt             pgtype.Timestamptz
+	CanceledAt           pgtype.Timestamptz
+	EndedAt              pgtype.Timestamptz
+	Seats                *int32
+	BillingInterval      *string
+	StripeScheduleId     *string
 }
 
 type User struct {

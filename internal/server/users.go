@@ -28,15 +28,6 @@ type User struct {
 	TermsAgreedAt                *time.Time `json:"terms_agreed_at,omitempty"`
 }
 
-type CreateUserParams struct {
-	ID            uuid.UUID `json:"id" binding:"required"`
-	Email         string    `json:"email" binding:"required"`
-	FirstName     string    `json:"first_name" binding:"required"`
-	LastName      string    `json:"last_name" binding:"required"`
-	MobilePhone   string    `json:"mobile_phone" binding:"required"`
-	Role          string    `json:"role"`
-	TermsAgreedAt time.Time `json:"terms_agreed_at"`
-}
 
 type CreateInvitedUserParams struct {
 	ID            uuid.UUID `json:"id"`

@@ -41,6 +41,12 @@ SET
 WHERE id = sqlc.arg(id)
 RETURNING *;
 
+-- name: UpdateUserPracticeID :one
+UPDATE users
+SET practice_id = sqlc.arg(practice_id)
+WHERE id = sqlc.arg(id)
+RETURNING *;
+
 -- name: DeleteUser :one
 UPDATE users
 SET deleted_at = NOW()

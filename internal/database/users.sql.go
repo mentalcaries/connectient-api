@@ -242,3 +242,39 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 	)
 	return i, err
 }
+
+const updateUserPracticeID = `-- name: UpdateUserPracticeID :one
+UPDATE users
+SET practice_id = $1
+WHERE id = $2
+RETURNING id, created_at, modified_at, first_name, last_name, mobile_phone, email, practice_id, role, org_role, is_active, invited_by, avatar_url, whatsapp_notifications_enabled, terms_agreed_at, deleted_at
+`
+
+type UpdateUserPracticeIDParams struct {
+	PracticeID *uuid.UUID
+	ID         uuid.UUID
+}
+
+func (q *Queries) UpdateUserPracticeID(ctx context.Context, arg UpdateUserPracticeIDParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserPracticeID, arg.PracticeID, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.FirstName,
+		&i.LastName,
+		&i.MobilePhone,
+		&i.Email,
+		&i.PracticeID,
+		&i.Role,
+		&i.OrgRole,
+		&i.IsActive,
+		&i.InvitedBy,
+		&i.AvatarUrl,
+		&i.WhatsappNotificationsEnabled,
+		&i.TermsAgreedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}

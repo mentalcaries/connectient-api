@@ -5,6 +5,10 @@ SELECT * FROM practices;
 SELECT * FROM practices
 WHERE id = sqlc.arg(id);
 
+-- name: GetPracticeByCode :one
+SELECT * FROM practices
+WHERE practice_code = sqlc.arg(practice_code);
+
 -- name: CreatePractice :one
 INSERT INTO practices (name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category)
 VALUES (

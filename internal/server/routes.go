@@ -20,7 +20,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router.GET("/", s.handleReadiness)
 	router.GET("/health", s.healthHandler)
 
-	router.POST("/users", s.handlerUserCreate)
+	router.POST("/register", s.handlerNewRegistration)
+	router.GET("/register/suggest-code", s.handlerSuggestPracticeCode)
+	router.GET("/register/check-code", s.handlerCheckCodeAvailability)
 
 	router.GET("/appointments", s.handlerAppointmentsGetAll)
 	router.GET("appointments/:id", s.handlerGetAppointmentById)
@@ -28,9 +30,6 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router.PATCH("/appointments", s.handlerAppointmentsUpdate)
 	router.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
 
-	router.GET("/register/suggest-code", s.handlerSuggestPracticeCode)
-	router.GET("/register/check-code", s.handlerCheckCodeAvailability)
-	
 
 	return router
 }
