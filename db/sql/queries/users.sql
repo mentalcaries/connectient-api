@@ -24,6 +24,18 @@ SELECT * FROM users;
 -- name: GetUser :one
 SELECT * FROM users WHERE id = sqlc.arg(id);
 
+-- name: GetUserWithSubscriptionStatus :one
+SELECT
+    u.*,
+    p.is_suspended AS practice_is_suspended,
+    s.status AS subscription_status,
+    s."trialEnd" AS subscription_trial_end,
+    s."periodEnd" AS subscription_period_end
+FROM users u
+LEFT JOIN practices p ON p.id = u.practice_id
+LEFT JOIN subscription s ON s."referenceId" = u.practice_id::text
+WHERE u.id = sqlc.arg(id);
+
 -- name: UpdateUser :one
 UPDATE users
 SET

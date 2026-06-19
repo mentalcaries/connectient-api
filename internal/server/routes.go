@@ -24,6 +24,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router.GET("/register/suggest-code", s.handlerSuggestPracticeCode)
 	router.GET("/register/check-code", s.handlerCheckCodeAvailability)
 
+	router.GET("/users/me", s.handlerGetCurrentUser)
+	
+
 	router.GET("/appointments", s.handlerAppointmentsGetAll)
 	router.GET("appointments/:id", s.handlerGetAppointmentById)
 	router.POST("/appointments", s.handlerAppointmentsCreate)

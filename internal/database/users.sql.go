@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -171,6 +172,70 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.WhatsappNotificationsEnabled,
 		&i.TermsAgreedAt,
 		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getUserWithSubscriptionStatus = `-- name: GetUserWithSubscriptionStatus :one
+SELECT
+    u.id, u.created_at, u.modified_at, u.first_name, u.last_name, u.mobile_phone, u.email, u.practice_id, u.role, u.org_role, u.is_active, u.invited_by, u.avatar_url, u.whatsapp_notifications_enabled, u.terms_agreed_at, u.deleted_at,
+    p.is_suspended AS practice_is_suspended,
+    s.status AS subscription_status,
+    s."trialEnd" AS subscription_trial_end,
+    s."periodEnd" AS subscription_period_end
+FROM users u
+LEFT JOIN practices p ON p.id = u.practice_id
+LEFT JOIN subscription s ON s."referenceId" = u.practice_id::text
+WHERE u.id = $1
+`
+
+type GetUserWithSubscriptionStatusRow struct {
+	ID                           uuid.UUID
+	CreatedAt                    *time.Time
+	ModifiedAt                   *time.Time
+	FirstName                    string
+	LastName                     string
+	MobilePhone                  *string
+	Email                        *string
+	PracticeID                   *uuid.UUID
+	Role                         *string
+	OrgRole                      *string
+	IsActive                     bool
+	InvitedBy                    *uuid.UUID
+	AvatarUrl                    *string
+	WhatsappNotificationsEnabled bool
+	TermsAgreedAt                *time.Time
+	DeletedAt                    *time.Time
+	PracticeIsSuspended          *bool
+	SubscriptionStatus           *string
+	SubscriptionTrialEnd         pgtype.Timestamptz
+	SubscriptionPeriodEnd        pgtype.Timestamptz
+}
+
+func (q *Queries) GetUserWithSubscriptionStatus(ctx context.Context, id uuid.UUID) (GetUserWithSubscriptionStatusRow, error) {
+	row := q.db.QueryRow(ctx, getUserWithSubscriptionStatus, id)
+	var i GetUserWithSubscriptionStatusRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.FirstName,
+		&i.LastName,
+		&i.MobilePhone,
+		&i.Email,
+		&i.PracticeID,
+		&i.Role,
+		&i.OrgRole,
+		&i.IsActive,
+		&i.InvitedBy,
+		&i.AvatarUrl,
+		&i.WhatsappNotificationsEnabled,
+		&i.TermsAgreedAt,
+		&i.DeletedAt,
+		&i.PracticeIsSuspended,
+		&i.SubscriptionStatus,
+		&i.SubscriptionTrialEnd,
+		&i.SubscriptionPeriodEnd,
 	)
 	return i, err
 }

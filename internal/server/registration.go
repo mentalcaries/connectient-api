@@ -78,12 +78,11 @@ type CreateSubscriptionParams struct {
 
 func (s *Server) handlerNewRegistration(c *gin.Context) {
 	tx, err := s.db.Pool().Begin(c)
-
 	if err != nil {
-		defer tx.Rollback(c)
-	} else {
-		defer tx.Commit(c)
+		respondWithError(c, http.StatusInternalServerError, "could not begin transaction", err)
+		return
 	}
+	defer tx.Rollback(c)
 
 	var req RegisterRequest
 
@@ -195,6 +194,11 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 	})
 	if err != nil {
 		respondWithError(c, http.StatusInternalServerError, "could not create subscription", err)
+		return
+	}
+
+	if err := tx.Commit(c); err != nil {
+		respondWithError(c, http.StatusInternalServerError, "could not commit transaction", err)
 		return
 	}
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,11 +26,13 @@ type AuthUser struct {
 	Name       string     `json:"name"`
 	PracticeId *uuid.UUID `json:"practice_id"`
 	Role       *string    `json:"role"`
+	IsActive   *bool      `json:"is_active"`
+	DeletedAt  *time.Time `json:"deleted_at"`
 }
 
 type TokenClaims struct {
-	ID uuid.UUID
-	Email  string
+	ID    uuid.UUID
+	Email string
 }
 
 var (
@@ -86,6 +89,8 @@ func (s *Server) UserFromRequest(c *gin.Context) (AuthUser, error) {
 		Name:       user.FirstName + " " + user.LastName,
 		PracticeId: user.PracticeID,
 		Role:       user.Role,
+		IsActive:   &user.IsActive,
+		DeletedAt:  user.DeletedAt,
 	}, nil
 }
 
