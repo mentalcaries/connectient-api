@@ -111,11 +111,7 @@ type UpdateUserProfileParams struct {
 // }
 
 func (s *Server) handlerGetCurrentUser(c *gin.Context) {
-	claims, err := s.ClaimsFromRequest(c)
-	if err != nil {
-		respondWithError(c, http.StatusUnauthorized, "not authenticated", err)
-		return
-	}
+	claims := c.MustGet("claims").(TokenClaims)
 
 	user, err := s.DBQuery.GetUserWithSubscriptionStatus(c, claims.ID)
 	if err != nil {

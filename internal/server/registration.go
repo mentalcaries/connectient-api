@@ -77,12 +77,7 @@ type CreateSubscriptionParams struct {
 }
 
 func (s *Server) handlerNewRegistration(c *gin.Context) {
-	tx, err := s.db.Pool().Begin(c)
-	if err != nil {
-		respondWithError(c, http.StatusInternalServerError, "could not begin transaction", err)
-		return
-	}
-	defer tx.Rollback(c)
+	claims := c.MustGet("claims").(TokenClaims)
 
 	var req RegisterRequest
 
@@ -91,20 +86,22 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 		return
 	}
 
-	user, err := s.ClaimsFromRequest(c)
+	tx, err := s.db.Pool().Begin(c)
 	if err != nil {
-		respondWithError(c, http.StatusUnauthorized, "authorization required", err)
+		respondWithError(c, http.StatusInternalServerError, "could not begin transaction", err)
 		return
 	}
+	defer tx.Rollback(c)
+
 
 	currentTime := time.Now()
 	role := "owner"
 
-	createdUser, err := s.DBQuery.CreateUser(c, db.CreateUserParams{
-		ID:            user.ID,
+	user, err := s.DBQuery.CreateUser(c, db.CreateUserParams{
+		ID:            claims.ID,
 		FirstName:     req.FirstName,
 		LastName:      req.LastName,
-		Email:         &user.Email,
+		Email:         &claims.Email,
 		MobilePhone:   &req.MobilePhone,
 		TermsAgreedAt: &currentTime,
 		Role:          &role,
@@ -140,7 +137,7 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 	}
 
 	_, err = s.DBQuery.UpdateUserPracticeID(c, db.UpdateUserPracticeIDParams{
-		ID:         createdUser.ID,
+		ID:         user.ID,
 		PracticeID: &createdPractice.ID,
 	})
 

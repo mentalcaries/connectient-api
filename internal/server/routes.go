@@ -7,6 +7,34 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func (s *Server) AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		user, err := s.UserFromRequest(c)
+		if err != nil {
+			respondWithError(c, http.StatusUnauthorized, "authorization required", err)
+			c.Abort()
+			return
+		}
+		c.Set("user", user)
+		c.Next()
+	}
+}
+
+func (s *Server) ClaimsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		claims, err := s.ClaimsFromRequest(c)
+		if err != nil {
+			respondWithError(c, http.StatusUnauthorized, "authorization required", err)
+			c.Abort()
+			return
+		}
+		c.Set("claims", claims)
+		c.Next()
+	}
+}
+
 func (s *Server) RegisterRoutes() http.Handler {
 	router := gin.Default()
 
@@ -17,22 +45,33 @@ func (s *Server) RegisterRoutes() http.Handler {
 		AllowCredentials: true, // Enable cookies/auth
 	}))
 
-	router.GET("/", s.handleReadiness)
-	router.GET("/health", s.healthHandler)
+	public := router.Group("/")
+	{
+		public.GET("/", s.handleReadiness)
+		public.GET("/health", s.healthHandler)
+		public.POST("/appointments", s.handlerAppointmentsCreate)
+		public.GET("/register/suggest-code", s.handlerSuggestPracticeCode)
+		public.GET("/register/check-code", s.handlerCheckCodeAvailability)
 
-	router.POST("/register", s.handlerNewRegistration)
-	router.GET("/register/suggest-code", s.handlerSuggestPracticeCode)
-	router.GET("/register/check-code", s.handlerCheckCodeAvailability)
+	}
 
-	router.GET("/users/me", s.handlerGetCurrentUser)
-	
+	claimsOnly := router.Group("/")
+	claimsOnly.Use(s.ClaimsMiddleware())
+	{
+		claimsOnly.POST("/register", s.handlerNewRegistration)
+		claimsOnly.GET("/users/me", s.handlerGetCurrentUser)
 
-	router.GET("/appointments", s.handlerAppointmentsGetAll)
-	router.GET("appointments/:id", s.handlerGetAppointmentById)
-	router.POST("/appointments", s.handlerAppointmentsCreate)
-	router.PATCH("/appointments", s.handlerAppointmentsUpdate)
-	router.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
+	}
 
+	authenticated := router.Group("/")
+	authenticated.Use(s.AuthMiddleware())
+	{
+		authenticated.GET("/appointments", s.handlerAppointmentsGetAll)
+		authenticated.GET("appointments/:id", s.handlerGetAppointmentById)
+		authenticated.PATCH("/appointments", s.handlerAppointmentsUpdate)
+		authenticated.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
+
+	}
 
 	return router
 }

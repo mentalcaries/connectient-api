@@ -103,6 +103,7 @@ func (s *Server) handlerSuggestPracticeCode(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "suggestion": slug})
 }
 
+
 func (s *Server) handlerCheckCodeAvailability(c *gin.Context) {
 	code := c.Query("code")
 	if strings.TrimSpace(code) == "" {
