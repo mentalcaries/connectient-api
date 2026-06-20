@@ -4,7 +4,7 @@ One Paragraph of project description goes here
 
 ## Description
 
-Here is the backend (REST API) for Connectient. This represents the final split and decoupling of the initial Next.js/Supabase architecture. The routes set up here are derived directly from the API routes initially set up in Next.js, and bypasses the Supabase client directly to work with any PostgreSQL database - essentially allowing for portability of the application.
+Here is the backend (REST API) for Connectient - an appointment booking and patient management app for healthcare practices. This represents the final split and decoupling of the initial Next.js/Supabase architecture. The routes set up here are derived directly from the API routes initially set up in Next.js, and bypasses the Supabase client directly to work with any PostgreSQL database - essentially allowing for portability of the application.
 
 
 #### Stack for this configuration:
