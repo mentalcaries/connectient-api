@@ -57,7 +57,8 @@ type UpdateAppointmentRequest struct {
 }
 
 func (s *Server) handlerAppointmentsGetAll(c *gin.Context) {
-	dbAppts, err := s.DBQuery.GetAppointments(c)
+	user := c.MustGet("user").(AuthUser)
+	dbAppts, err := s.DBQuery.GetAppointments(c, *user.PracticeId)
 	if err != nil {
 		respondWithError(c, http.StatusInternalServerError, "Could not get Appointments", err)
 		return

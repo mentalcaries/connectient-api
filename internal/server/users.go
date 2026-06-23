@@ -38,6 +38,9 @@ type CurrentUser struct {
 	Status      *string    `json:"status"`
 	TrialEnd    *time.Time `json:"trial_end"`
 	PeriodEnd   *time.Time `json:"period_end"`
+	AvatarURL   *string    `json:"avatar_url,omitempty"`
+	Plan        *string    `json:"plan"`
+	CancelAt    *time.Time `json:"cancel_at"`
 }
 
 type CreateInvitedUserParams struct {
@@ -131,5 +134,8 @@ func (s *Server) handlerGetCurrentUser(c *gin.Context) {
 		Status:      user.SubscriptionStatus,
 		TrialEnd:    &user.SubscriptionTrialEnd.Time,
 		PeriodEnd:   &user.SubscriptionPeriodEnd.Time,
+		AvatarURL:   user.AvatarUrl,
+		Plan:        user.SubscriptionPlan,
+		CancelAt:    &user.SubscriptionCancelAt.Time,
 	})
 }

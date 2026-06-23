@@ -1,6 +1,26 @@
 package server
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+type ProcedureType struct {
+	ID         uuid.UUID  `json:"id"`
+	CreatedAt  time.Time  `json:"created_at"`
+	DeletedAt  *time.Time `json:"deleted_at"`
+	PracticeID uuid.UUID  `json:"practice_id"`
+	Name       string     `json:"name"`
+	Value      string     `json:"value"`
+	IsActive   bool       `json:"is_active"`
+	IsDefault  bool       `json:"is_default"`
+	IsPrimary  bool       `json:"is_primary"`
+	SortOrder  int        `json:"sort_order"`
+}
 
 type DefaultProcedureType struct {
 	Name      string
@@ -49,4 +69,33 @@ var DefaultSettingsByCategory = map[string]DefaultPracticeSettings{
 	"medical":       {},
 	"optometry":     {OptometryHistoryEnabled: true},
 	"physiotherapy": {PhysiotherapyHistoryEnabled: true},
+}
+
+func (s *Server) handlerGetPracticeProcedures(c *gin.Context) {
+	user := c.MustGet("user").(AuthUser)
+
+	dbProcedures, err := s.DBQuery.GetProcedureTypesByPracticeID(c, *user.PracticeId)
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "could not get procedures", err)
+		return
+	}
+
+	procedures := []ProcedureType{}
+
+	for _, dbProcedure := range dbProcedures {
+		procedures = append(procedures, ProcedureType{
+			ID:         dbProcedure.ID,
+			CreatedAt:  dbProcedure.CreatedAt,
+			DeletedAt:  dbProcedure.DeletedAt,
+			Name:       dbProcedure.Name,
+			Value:      dbProcedure.Value,
+			IsActive:   dbProcedure.IsActive,
+			IsDefault:  dbProcedure.IsDefault,
+			IsPrimary:  dbProcedure.IsPrimary,
+			SortOrder:  int(dbProcedure.SortOrder),
+			PracticeID: dbProcedure.PracticeID,
+		})
+	}
+
+	c.JSON(http.StatusOK, procedures)
 }

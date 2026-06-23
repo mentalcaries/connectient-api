@@ -2,8 +2,10 @@
 SELECT * FROM practices;
 
 -- name: GetPractice :one
-SELECT * FROM practices
-WHERE id = sqlc.arg(id);
+SELECT p.*, s.*
+FROM practices p
+LEFT JOIN practice_settings s ON s.practice_id = p.id
+WHERE p.id = sqlc.arg(id);
 
 -- name: GetPracticeByCode :one
 SELECT * FROM practices

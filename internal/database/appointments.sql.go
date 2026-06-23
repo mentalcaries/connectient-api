@@ -190,11 +190,11 @@ func (q *Queries) GetAppointmentById(ctx context.Context, id uuid.UUID) (Appoint
 }
 
 const getAppointments = `-- name: GetAppointments :many
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at FROM appointments
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at FROM appointments WHERE practice_id = $1
 `
 
-func (q *Queries) GetAppointments(ctx context.Context) ([]Appointment, error) {
-	rows, err := q.db.Query(ctx, getAppointments)
+func (q *Queries) GetAppointments(ctx context.Context, practiceID uuid.UUID) ([]Appointment, error) {
+	rows, err := q.db.Query(ctx, getAppointments, practiceID)
 	if err != nil {
 		return nil, err
 	}

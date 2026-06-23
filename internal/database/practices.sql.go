@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -91,13 +92,48 @@ func (q *Queries) CreatePractice(ctx context.Context, arg CreatePracticeParams) 
 }
 
 const getPractice = `-- name: GetPractice :one
-SELECT id, created_at, modified_at, name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category, is_active FROM practices
-WHERE id = $1
+SELECT p.id, p.created_at, p.modified_at, p.name, p.city, p.phone, p.email, p.practice_code, p.logo, p.street_address, p.facebook, p.instagram, p.website, p.has_multiple_providers, p.specialty, p.is_suspended, p.practice_category, p.is_active, s.id, s.created_at, s.updated_at, s.practice_id, s.dental_history_enabled, s.tmj_history_enabled, s.multiple_locations_enabled, s.optometry_history_enabled, s.physiotherapy_history_enabled, s.custom_form_sections, s.theme, s.theme_colors
+FROM practices p
+LEFT JOIN practice_settings s ON s.practice_id = p.id
+WHERE p.id = $1
 `
 
-func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (Practice, error) {
+type GetPracticeRow struct {
+	ID                          uuid.UUID
+	CreatedAt                   *time.Time
+	ModifiedAt                  time.Time
+	Name                        string
+	City                        string
+	Phone                       *string
+	Email                       *string
+	PracticeCode                string
+	Logo                        *string
+	StreetAddress               *string
+	Facebook                    *string
+	Instagram                   *string
+	Website                     *string
+	HasMultipleProviders        bool
+	Specialty                   *string
+	IsSuspended                 bool
+	PracticeCategory            string
+	IsActive                    bool
+	ID_2                        *uuid.UUID
+	CreatedAt_2                 *time.Time
+	UpdatedAt                   *time.Time
+	PracticeID                  *uuid.UUID
+	DentalHistoryEnabled        *bool
+	TmjHistoryEnabled           *bool
+	MultipleLocationsEnabled    *bool
+	OptometryHistoryEnabled     *bool
+	PhysiotherapyHistoryEnabled *bool
+	CustomFormSections          []byte
+	Theme                       *string
+	ThemeColors                 []byte
+}
+
+func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (GetPracticeRow, error) {
 	row := q.db.QueryRow(ctx, getPractice, id)
-	var i Practice
+	var i GetPracticeRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
@@ -117,6 +153,18 @@ func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (Practice, erro
 		&i.IsSuspended,
 		&i.PracticeCategory,
 		&i.IsActive,
+		&i.ID_2,
+		&i.CreatedAt_2,
+		&i.UpdatedAt,
+		&i.PracticeID,
+		&i.DentalHistoryEnabled,
+		&i.TmjHistoryEnabled,
+		&i.MultipleLocationsEnabled,
+		&i.OptometryHistoryEnabled,
+		&i.PhysiotherapyHistoryEnabled,
+		&i.CustomFormSections,
+		&i.Theme,
+		&i.ThemeColors,
 	)
 	return i, err
 }

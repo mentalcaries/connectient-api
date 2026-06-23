@@ -201,34 +201,3 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Successfully created " + createdPractice.Name, "practiceId": createdPractice.ID})
 }
-
-// # 1. Validate required fields
-// if req.Name == "" or req.PracticeCategory == "" or req.PracticeCode == ""
-//    or req.City == "" or req.FirstName == "" or req.LastName == "" or req.MobilePhone == "":
-//     return 400 "missing required fields"
-
-// if not req.TermsAgreed:
-//     return 400 "terms_required"
-
-// # 2. Check user hasn't already onboarded
-// if userID already exists in Users:
-//     return 409 "onboarding already completed"
-
-// # 3. Reject reserved practice codes (app routes — cannot collide)
-// if req.PracticeCode in RESERVED_CODES:
-//     return 409 "practice code unavailable"
-
-// # 4. Begin transaction
-// tx := db.Begin()
-// defer tx.Rollback() on error
-
-// user := CreateUser(tx, ...)               # practice_id = null, role = owner
-// practice := CreatePractice(tx, ...)        # UNIQUE constraint catches duplicate code
-// UpdateUserPractice(tx, user.ID, practice.ID)
-// CreatePracticeSettings(tx, defaultsFor(req.PracticeCategory))
-// CreateProcedureTypesBulk(tx, defaultsFor(req.PracticeCategory))
-// CreateSubscription(tx, practice.ID, plan: "pro", status: "trialing", trial: 30 days)
-
-// tx.Commit()
-
-// return 201 { practice_id: practice.ID, redirect_to: "/admin/dashboard" }

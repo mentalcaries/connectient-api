@@ -39,10 +39,10 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, 
+		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type"},
-		AllowCredentials: true, 
+		AllowCredentials: true,
 	}))
 
 	public := router.Group("/")
@@ -71,6 +71,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.PATCH("/appointments", s.handlerAppointmentsUpdate)
 		authenticated.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
 
+		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
+		authenticated.GET("/practices/procedure-types", s.handlerGetPracticeProcedures)
 	}
 
 	return router

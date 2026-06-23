@@ -1,5 +1,5 @@
 -- name: GetAppointments :many
-SELECT * FROM appointments;
+SELECT * FROM appointments WHERE practice_id = sqlc.arg(practice_id);
 
 -- name: CreateAppointment :one
 INSERT INTO appointments (

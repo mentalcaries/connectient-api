@@ -182,7 +182,9 @@ SELECT
     p.is_suspended AS practice_is_suspended,
     s.status AS subscription_status,
     s."trialEnd" AS subscription_trial_end,
-    s."periodEnd" AS subscription_period_end
+    s."periodEnd" AS subscription_period_end,
+    s.plan AS subscription_plan,
+    s."cancelAt" AS subscription_cancel_at
 FROM users u
 LEFT JOIN practices p ON p.id = u.practice_id
 LEFT JOIN subscription s ON s."referenceId" = u.practice_id::text
@@ -210,6 +212,8 @@ type GetUserWithSubscriptionStatusRow struct {
 	SubscriptionStatus           *string
 	SubscriptionTrialEnd         pgtype.Timestamptz
 	SubscriptionPeriodEnd        pgtype.Timestamptz
+	SubscriptionPlan             *string
+	SubscriptionCancelAt         pgtype.Timestamptz
 }
 
 func (q *Queries) GetUserWithSubscriptionStatus(ctx context.Context, id uuid.UUID) (GetUserWithSubscriptionStatusRow, error) {
@@ -236,6 +240,8 @@ func (q *Queries) GetUserWithSubscriptionStatus(ctx context.Context, id uuid.UUI
 		&i.SubscriptionStatus,
 		&i.SubscriptionTrialEnd,
 		&i.SubscriptionPeriodEnd,
+		&i.SubscriptionPlan,
+		&i.SubscriptionCancelAt,
 	)
 	return i, err
 }

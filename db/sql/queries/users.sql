@@ -30,7 +30,9 @@ SELECT
     p.is_suspended AS practice_is_suspended,
     s.status AS subscription_status,
     s."trialEnd" AS subscription_trial_end,
-    s."periodEnd" AS subscription_period_end
+    s."periodEnd" AS subscription_period_end,
+    s.plan AS subscription_plan,
+    s."cancelAt" AS subscription_cancel_at
 FROM users u
 LEFT JOIN practices p ON p.id = u.practice_id
 LEFT JOIN subscription s ON s."referenceId" = u.practice_id::text
