@@ -56,7 +56,18 @@ type UpdateAppointmentRequest struct {
 	IsCancelled   bool       `json:"is_cancelled,omitempty"`
 }
 
-func (s *Server) handlerAppointmentsGetAll(c *gin.Context) {
+type ConfirmedAppointment struct {
+	ID              uuid.UUID `json:"id"`
+	FirstName       string    `json:"first_name"`
+	LastName        string    `json:"last_name"`
+	AppointmentType string    `json:"appointment_type"`
+	MobilePhone     string    `json:"mobile_phone"`
+	ScheduledDate   time.Time `json:"scheduled_date"`
+	ScheduledTime   *string   `json:"scheduled_time"`
+	DurationMinutes *int      `json:"duration_minutes"`
+}
+
+func (s *Server) handlerGetAllAppointments(c *gin.Context) {
 	user := c.MustGet("user").(AuthUser)
 	dbAppts, err := s.DBQuery.GetAppointments(c, *user.PracticeId)
 	if err != nil {
@@ -87,6 +98,43 @@ func (s *Server) handlerAppointmentsGetAll(c *gin.Context) {
 			ScheduledTime:   dbAppt.ScheduledTime,
 			PracticeID:      dbAppt.PracticeID,
 			Token:           dbAppt.Token,
+		})
+	}
+	c.JSON(http.StatusOK, appointments)
+}
+
+func (s *Server) handlerGetConfirmedAppointments(c *gin.Context) {
+	user := c.MustGet("user").(AuthUser)
+	startDate, err := time.Parse("2006-01-02", c.Query("start"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "invalid start date", err)
+		return
+	}
+	endDate, err := time.Parse("2006-01-02", c.Query("end"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "invalid start date", err)
+		return
+	}
+	dbAppts, err := s.DBQuery.GetConfirmedAppointments(c, db.GetConfirmedAppointmentsParams{
+		PracticeID: *user.PracticeId,
+		StartDate:  &startDate,
+		EndDate:    &endDate,
+	})
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "Could not get Appointments", err)
+		return
+	}
+	appointments := []ConfirmedAppointment{}
+
+	for _, dbAppt := range dbAppts {
+		appointments = append(appointments, ConfirmedAppointment{
+			ID:              dbAppt.ID,
+			FirstName:       dbAppt.FirstName,
+			LastName:        dbAppt.LastName,
+			MobilePhone:     dbAppt.MobilePhone,
+			AppointmentType: dbAppt.AppointmentType,
+			ScheduledDate:   *dbAppt.ScheduledDate,
+			ScheduledTime:   dbAppt.ScheduledTime,
 		})
 	}
 	c.JSON(http.StatusOK, appointments)

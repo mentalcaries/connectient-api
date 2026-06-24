@@ -52,6 +52,25 @@ RETURNING *;
 -- name: GetAppointmentById :one
 SELECT * FROM appointments WHERE id = sqlc.arg(id);
 
+-- name: GetConfirmedAppointments :many
+SELECT
+    id,
+    first_name,
+    last_name,
+    appointment_type,
+    mobile_phone,
+    scheduled_date,
+    scheduled_time,
+    duration_minutes
+FROM appointments
+WHERE practice_id = sqlc.arg(practice_id)
+AND is_scheduled = true
+AND is_cancelled = false
+AND scheduled_date >= sqlc.arg(start_date)
+AND scheduled_date <= sqlc.arg(end_date)
+ORDER BY scheduled_date ASC, scheduled_time ASC;
+
+
 -- name: UpdateAppointment :one
 UPDATE appointments
 SET

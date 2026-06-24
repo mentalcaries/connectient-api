@@ -66,13 +66,15 @@ func (s *Server) RegisterRoutes() http.Handler {
 	authenticated := router.Group("/")
 	authenticated.Use(s.AuthMiddleware())
 	{
-		authenticated.GET("/appointments", s.handlerAppointmentsGetAll)
+		authenticated.GET("/appointments", s.handlerGetAllAppointments)
 		authenticated.GET("appointments/:id", s.handlerGetAppointmentById)
 		authenticated.PATCH("/appointments", s.handlerAppointmentsUpdate)
 		authenticated.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
+		authenticated.GET("/appointments/confirmed", s.handlerGetConfirmedAppointments)
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/procedure-types", s.handlerGetPracticeProcedures)
+		authenticated.GET("/practices/connected-apps", s.handlerGetConnectedApps)
 	}
 
 	return router

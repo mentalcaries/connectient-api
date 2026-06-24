@@ -239,6 +239,71 @@ func (q *Queries) GetAppointments(ctx context.Context, practiceID uuid.UUID) ([]
 	return items, nil
 }
 
+const getConfirmedAppointments = `-- name: GetConfirmedAppointments :many
+SELECT
+    id,
+    first_name,
+    last_name,
+    appointment_type,
+    mobile_phone,
+    scheduled_date,
+    scheduled_time,
+    duration_minutes
+FROM appointments
+WHERE practice_id = $1
+AND is_scheduled = true
+AND is_cancelled = false
+AND scheduled_date >= $2
+AND scheduled_date <= $3
+ORDER BY scheduled_date ASC, scheduled_time ASC
+`
+
+type GetConfirmedAppointmentsParams struct {
+	PracticeID uuid.UUID
+	StartDate  *time.Time
+	EndDate    *time.Time
+}
+
+type GetConfirmedAppointmentsRow struct {
+	ID              uuid.UUID
+	FirstName       string
+	LastName        string
+	AppointmentType string
+	MobilePhone     string
+	ScheduledDate   *time.Time
+	ScheduledTime   *string
+	DurationMinutes *int32
+}
+
+func (q *Queries) GetConfirmedAppointments(ctx context.Context, arg GetConfirmedAppointmentsParams) ([]GetConfirmedAppointmentsRow, error) {
+	rows, err := q.db.Query(ctx, getConfirmedAppointments, arg.PracticeID, arg.StartDate, arg.EndDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetConfirmedAppointmentsRow
+	for rows.Next() {
+		var i GetConfirmedAppointmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.AppointmentType,
+			&i.MobilePhone,
+			&i.ScheduledDate,
+			&i.ScheduledTime,
+			&i.DurationMinutes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const manageAppointmentByToken = `-- name: ManageAppointmentByToken :one
 UPDATE appointments
 SET
