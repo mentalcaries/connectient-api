@@ -142,22 +142,34 @@ func (q *Queries) CreateAppointment(ctx context.Context, arg CreateAppointmentPa
 
 const deleteAppointment = `-- name: DeleteAppointment :one
 DELETE FROM appointments
-WHERE id = $1
+WHERE id = $1 AND practice_id = $2
 RETURNING id
 `
 
-func (q *Queries) DeleteAppointment(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, deleteAppointment, id)
+type DeleteAppointmentParams struct {
+	ID         uuid.UUID
+	PracticeID uuid.UUID
+}
+
+func (q *Queries) DeleteAppointment(ctx context.Context, arg DeleteAppointmentParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, deleteAppointment, arg.ID, arg.PracticeID)
+	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
 }
 
 const getAppointmentById = `-- name: GetAppointmentById :one
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at FROM appointments WHERE id = $1
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at FROM appointments
+WHERE id = $1 AND practice_id = $2
 `
 
-func (q *Queries) GetAppointmentById(ctx context.Context, id uuid.UUID) (Appointment, error) {
-	row := q.db.QueryRow(ctx, getAppointmentById, id)
+type GetAppointmentByIdParams struct {
+	ID         uuid.UUID
+	PracticeID uuid.UUID
+}
+
+func (q *Queries) GetAppointmentById(ctx context.Context, arg GetAppointmentByIdParams) (Appointment, error) {
+	row := q.db.QueryRow(ctx, getAppointmentById, arg.ID, arg.PracticeID)
 	var i Appointment
 	err := row.Scan(
 		&i.ID,

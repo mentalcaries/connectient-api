@@ -50,7 +50,8 @@ INSERT INTO appointments (
 RETURNING *;
 
 -- name: GetAppointmentById :one
-SELECT * FROM appointments WHERE id = sqlc.arg(id);
+SELECT * FROM appointments
+WHERE id = sqlc.arg(id) AND practice_id = sqlc.arg(practice_id);
 
 -- name: GetConfirmedAppointments :many
 SELECT
@@ -112,5 +113,5 @@ RETURNING *;
 
 -- name: DeleteAppointment :one
 DELETE FROM appointments
-WHERE id = sqlc.arg(id)
+WHERE id = sqlc.arg(id) AND practice_id = sqlc.arg(practice_id)
 RETURNING id;
