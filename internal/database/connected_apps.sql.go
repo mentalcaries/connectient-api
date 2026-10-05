@@ -12,31 +12,27 @@ import (
 )
 
 const getConnectedApps = `-- name: GetConnectedApps :many
-SELECT id, created_at, updated_at, practice_id, provider, connected_account_email, access_token, refresh_token, token_expires_at, is_connected, last_error FROM connected_apps WHERE practice_id = $1
+SELECT provider, connected_account_email, is_connected
+FROM connected_apps
+WHERE practice_id = $1
 `
 
-func (q *Queries) GetConnectedApps(ctx context.Context, practiceID uuid.UUID) ([]ConnectedApp, error) {
+type GetConnectedAppsRow struct {
+	Provider              string
+	ConnectedAccountEmail *string
+	IsConnected           bool
+}
+
+func (q *Queries) GetConnectedApps(ctx context.Context, practiceID uuid.UUID) ([]GetConnectedAppsRow, error) {
 	rows, err := q.db.Query(ctx, getConnectedApps, practiceID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ConnectedApp
+	var items []GetConnectedAppsRow
 	for rows.Next() {
-		var i ConnectedApp
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.PracticeID,
-			&i.Provider,
-			&i.ConnectedAccountEmail,
-			&i.AccessToken,
-			&i.RefreshToken,
-			&i.TokenExpiresAt,
-			&i.IsConnected,
-			&i.LastError,
-		); err != nil {
+		var i GetConnectedAppsRow
+		if err := rows.Scan(&i.Provider, &i.ConnectedAccountEmail, &i.IsConnected); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
