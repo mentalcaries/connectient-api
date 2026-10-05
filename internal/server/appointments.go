@@ -3,12 +3,14 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	db "github.com/mentalcaries/connectient-api/internal/database"
 )
 
@@ -231,6 +233,11 @@ func (s *Server) handlerAppointmentsCreate(c *gin.Context) {
 }
 
 func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
+	user := c.MustGet("user").(AuthUser)
+	if user.PracticeId == nil {
+		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
+		return
+	}
 	id, err := parseId(c, "id")
 	if err != nil {
 		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
@@ -245,12 +252,17 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 	}
 	updatedAppt, err := s.DBQuery.UpdateAppointment(c, db.UpdateAppointmentParams{
 		ID:            id,
+		PracticeID:    *user.PracticeId,
 		ScheduledDate: req.ScheduledDate,
 		ScheduledTime: req.ScheduledTime,
 		IsScheduled:   &req.IsScheduled,
 		IsCancelled:   &req.IsCancelled,
 	})
 
+	if errors.Is(err, pgx.ErrNoRows) {
+		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(c, http.StatusInternalServerError, "Could not update appointment", err)
 		return

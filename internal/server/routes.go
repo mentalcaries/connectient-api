@@ -68,7 +68,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	{
 		authenticated.GET("/appointments", s.handlerGetAllAppointments)
 		authenticated.GET("appointments/:id", s.handlerGetAppointmentById)
-		authenticated.PATCH("/appointments", s.handlerAppointmentsUpdate)
+		authenticated.PATCH("/appointments/:id", s.handlerAppointmentsUpdate)
 		authenticated.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
 		authenticated.GET("/appointments/confirmed", s.handlerGetConfirmedAppointments)
 
