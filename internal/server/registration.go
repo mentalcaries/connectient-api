@@ -92,12 +92,11 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback(c)
-
-
+	queries := s.DBQuery.WithTx(tx)
 	currentTime := time.Now()
 	role := "owner"
 
-	user, err := s.DBQuery.CreateUser(c, db.CreateUserParams{
+	user, err := queries.CreateUser(c, db.CreateUserParams{
 		ID:            claims.ID,
 		FirstName:     req.FirstName,
 		LastName:      req.LastName,
@@ -122,7 +121,7 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 		return
 	}
 
-	createdPractice, err := s.DBQuery.CreatePractice(c, db.CreatePracticeParams{
+	createdPractice, err := queries.CreatePractice(c, db.CreatePracticeParams{
 		Name:                 req.Name,
 		City:                 req.City,
 		PracticeCategory:     req.PracticeCategory,
@@ -136,7 +135,7 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 		return
 	}
 
-	_, err = s.DBQuery.UpdateUserPracticeID(c, db.UpdateUserPracticeIDParams{
+	_, err = queries.UpdateUserPracticeID(c, db.UpdateUserPracticeIDParams{
 		ID:         user.ID,
 		PracticeID: &createdPractice.ID,
 	})
@@ -149,7 +148,7 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 	defaultSettings := DefaultSettingsByCategory[createdPractice.PracticeCategory]
 	defaultProcedures := DefaultProcedureTypes[createdPractice.PracticeCategory]
 
-	_, err = s.DBQuery.CreatePracticeSettings(c, db.CreatePracticeSettingsParams{
+	_, err = queries.CreatePracticeSettings(c, db.CreatePracticeSettingsParams{
 		PracticeID:                  createdPractice.ID,
 		DentalHistoryEnabled:        defaultSettings.DentalHistoryEnabled,
 		TmjHistoryEnabled:           defaultSettings.TMJHistoryEnabled,
@@ -165,7 +164,7 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 	}
 
 	for _, procedure := range defaultProcedures {
-		_, err := s.DBQuery.CreateProcedureType(c, db.CreateProcedureTypeParams{
+		_, err := queries.CreateProcedureType(c, db.CreateProcedureTypeParams{
 			PracticeID: createdPractice.ID,
 			Name:       procedure.Name,
 			Value:      procedure.Value,
@@ -182,7 +181,7 @@ func (s *Server) handlerNewRegistration(c *gin.Context) {
 
 	const trialDurationDays = 30
 
-	err = s.DBQuery.CreateSubscription(c, db.CreateSubscriptionParams{
+	err = queries.CreateSubscription(c, db.CreateSubscriptionParams{
 		ReferenceID: createdPractice.ID.String(),
 		Plan:        "pro",
 		Status:      "trialing",
