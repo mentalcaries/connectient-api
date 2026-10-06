@@ -9,7 +9,68 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createPracticeLocation = `-- name: CreatePracticeLocation :one
+INSERT INTO practice_locations (
+    practice_id,
+    name,
+    address,
+    is_active,
+    sort_order
+) VALUES (
+    $1,
+    $2,
+    $3,
+    TRUE,
+    $4
+)
+RETURNING id, created_at, deleted_at, practice_id, name, address, is_active,
+          sort_order, available_weekdays
+`
+
+type CreatePracticeLocationParams struct {
+	PracticeID uuid.UUID
+	Name       string
+	Address    *string
+	SortOrder  int32
+}
+
+func (q *Queries) CreatePracticeLocation(ctx context.Context, arg CreatePracticeLocationParams) (PracticeLocation, error) {
+	row := q.db.QueryRow(ctx, createPracticeLocation,
+		arg.PracticeID,
+		arg.Name,
+		arg.Address,
+		arg.SortOrder,
+	)
+	var i PracticeLocation
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.PracticeID,
+		&i.Name,
+		&i.Address,
+		&i.IsActive,
+		&i.SortOrder,
+		&i.AvailableWeekdays,
+	)
+	return i, err
+}
+
+const getNextPracticeLocationSortOrder = `-- name: GetNextPracticeLocationSortOrder :one
+SELECT (COALESCE(MAX(sort_order), 0) + 1)::integer
+FROM practice_locations
+WHERE practice_id = $1
+`
+
+func (q *Queries) GetNextPracticeLocationSortOrder(ctx context.Context, practiceID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, getNextPracticeLocationSortOrder, practiceID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
 
 const getPracticeLocationsByPracticeID = `-- name: GetPracticeLocationsByPracticeID :many
 SELECT id, created_at, deleted_at, practice_id, name, address, is_active,
@@ -48,4 +109,88 @@ func (q *Queries) GetPracticeLocationsByPracticeID(ctx context.Context, practice
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPracticeForLocationSort = `-- name: LockPracticeForLocationSort :one
+SELECT id
+FROM practices
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockPracticeForLocationSort(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockPracticeForLocationSort, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
+const patchPracticeLocation = `-- name: PatchPracticeLocation :execrows
+UPDATE practice_locations
+SET
+    name = CASE
+        WHEN $1::boolean THEN $2::text
+        ELSE name
+    END,
+    address = CASE
+        WHEN $3::boolean THEN $4::text
+        ELSE address
+    END,
+    is_active = CASE
+        WHEN $5::boolean THEN $6::boolean
+        ELSE is_active
+    END,
+    sort_order = CASE
+        WHEN $7::boolean THEN $8::integer
+        ELSE sort_order
+    END,
+    deleted_at = CASE
+        WHEN $9::boolean THEN $10::timestamptz
+        ELSE deleted_at
+    END,
+    available_weekdays = CASE
+        WHEN $11::boolean THEN $12::smallint[]
+        ELSE available_weekdays
+    END
+WHERE id = $13
+  AND practice_id = $14
+`
+
+type PatchPracticeLocationParams struct {
+	SetName              bool
+	Name                 string
+	SetAddress           bool
+	Address              *string
+	SetIsActive          bool
+	IsActive             bool
+	SetSortOrder         bool
+	SortOrder            int32
+	SetDeletedAt         bool
+	DeletedAt            pgtype.Timestamptz
+	SetAvailableWeekdays bool
+	AvailableWeekdays    []int16
+	ID                   uuid.UUID
+	PracticeID           uuid.UUID
+}
+
+func (q *Queries) PatchPracticeLocation(ctx context.Context, arg PatchPracticeLocationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, patchPracticeLocation,
+		arg.SetName,
+		arg.Name,
+		arg.SetAddress,
+		arg.Address,
+		arg.SetIsActive,
+		arg.IsActive,
+		arg.SetSortOrder,
+		arg.SortOrder,
+		arg.SetDeletedAt,
+		arg.DeletedAt,
+		arg.SetAvailableWeekdays,
+		arg.AvailableWeekdays,
+		arg.ID,
+		arg.PracticeID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

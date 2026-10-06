@@ -158,7 +158,7 @@ type PracticeLocation struct {
 	DeletedAt         *time.Time
 	PracticeID        uuid.UUID
 	Name              string
-	Address           string
+	Address           *string
 	IsActive          bool
 	SortOrder         int32
 	AvailableWeekdays []int16

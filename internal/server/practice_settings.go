@@ -43,7 +43,7 @@ type PracticeSettingsLocation struct {
 	DeletedAt         *time.Time `json:"deleted_at"`
 	PracticeID        uuid.UUID  `json:"practice_id"`
 	Name              string     `json:"name"`
-	Address           string     `json:"address"`
+	Address           *string    `json:"address"`
 	IsActive          bool       `json:"is_active"`
 	SortOrder         int32      `json:"sort_order"`
 	AvailableWeekdays []int16    `json:"available_weekdays"`
@@ -138,12 +138,7 @@ func procedureTypeResponses(rows []db.ProcedureType) []ProcedureType {
 func practiceLocationResponses(rows []db.PracticeLocation) []PracticeSettingsLocation {
 	result := make([]PracticeSettingsLocation, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, PracticeSettingsLocation{
-			ID: row.ID, CreatedAt: row.CreatedAt, DeletedAt: row.DeletedAt,
-			PracticeID: row.PracticeID, Name: row.Name, Address: row.Address,
-			IsActive: row.IsActive, SortOrder: row.SortOrder,
-			AvailableWeekdays: row.AvailableWeekdays,
-		})
+		result = append(result, practiceLocationResponse(row))
 	}
 	return result
 }

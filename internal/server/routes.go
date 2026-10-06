@@ -108,6 +108,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/settings", s.handlerGetPracticeSettings)
 		authenticated.PATCH("/practices/settings", requireAdmin(), s.handlerPatchPracticeSettings)
+		authenticated.GET("/practices/locations", s.handlerGetPracticeLocations)
+		authenticated.POST("/practices/locations", requireAdmin(), s.handlerCreatePracticeLocation)
+		authenticated.PATCH("/practices/locations/:id", requireAdmin(), s.handlerPatchPracticeLocation)
 		authenticated.GET("/practices/procedure-types", s.handlerGetPracticeProcedures)
 		authenticated.GET("/practices/connected-apps", requireOwner(), s.handlerGetConnectedApps)
 	}
