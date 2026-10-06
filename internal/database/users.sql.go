@@ -148,6 +148,112 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const getCurrentUserContext = `-- name: GetCurrentUserContext :one
+SELECT
+    u.id,
+    u.email,
+    u.first_name,
+    u.last_name,
+    u.avatar_url,
+    u.practice_id,
+    u.role,
+    u.is_active,
+    u.deleted_at,
+    p.id AS context_practice_id,
+    p.name AS practice_name,
+    p.logo AS practice_logo,
+    p.city AS practice_city,
+    p.street_address AS practice_street_address,
+    p.phone AS practice_phone,
+    p.email AS practice_email,
+    p.website AS practice_website,
+    p.practice_code,
+    p.instagram AS practice_instagram,
+    p.facebook AS practice_facebook,
+    p.has_multiple_providers,
+    p.practice_category,
+    p.specialty AS practice_specialty,
+    p.is_suspended,
+    s.status AS subscription_status,
+    s.plan AS subscription_plan,
+    s."trialEnd" AS subscription_trial_end,
+    s."periodEnd" AS subscription_period_end,
+    s."cancelAt" AS subscription_cancel_at
+FROM users u
+LEFT JOIN practices p ON p.id = u.practice_id
+LEFT JOIN subscription s ON s."referenceId" = u.practice_id::text
+WHERE u.id = $1
+`
+
+type GetCurrentUserContextRow struct {
+	ID                    uuid.UUID
+	Email                 *string
+	FirstName             string
+	LastName              string
+	AvatarUrl             *string
+	PracticeID            *uuid.UUID
+	Role                  *string
+	IsActive              bool
+	DeletedAt             *time.Time
+	ContextPracticeID     *uuid.UUID
+	PracticeName          *string
+	PracticeLogo          *string
+	PracticeCity          *string
+	PracticeStreetAddress *string
+	PracticePhone         *string
+	PracticeEmail         *string
+	PracticeWebsite       *string
+	PracticeCode          *string
+	PracticeInstagram     *string
+	PracticeFacebook      *string
+	HasMultipleProviders  *bool
+	PracticeCategory      *string
+	PracticeSpecialty     *string
+	IsSuspended           *bool
+	SubscriptionStatus    *string
+	SubscriptionPlan      *string
+	SubscriptionTrialEnd  pgtype.Timestamptz
+	SubscriptionPeriodEnd pgtype.Timestamptz
+	SubscriptionCancelAt  pgtype.Timestamptz
+}
+
+func (q *Queries) GetCurrentUserContext(ctx context.Context, id uuid.UUID) (GetCurrentUserContextRow, error) {
+	row := q.db.QueryRow(ctx, getCurrentUserContext, id)
+	var i GetCurrentUserContextRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.AvatarUrl,
+		&i.PracticeID,
+		&i.Role,
+		&i.IsActive,
+		&i.DeletedAt,
+		&i.ContextPracticeID,
+		&i.PracticeName,
+		&i.PracticeLogo,
+		&i.PracticeCity,
+		&i.PracticeStreetAddress,
+		&i.PracticePhone,
+		&i.PracticeEmail,
+		&i.PracticeWebsite,
+		&i.PracticeCode,
+		&i.PracticeInstagram,
+		&i.PracticeFacebook,
+		&i.HasMultipleProviders,
+		&i.PracticeCategory,
+		&i.PracticeSpecialty,
+		&i.IsSuspended,
+		&i.SubscriptionStatus,
+		&i.SubscriptionPlan,
+		&i.SubscriptionTrialEnd,
+		&i.SubscriptionPeriodEnd,
+		&i.SubscriptionCancelAt,
+	)
+	return i, err
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, created_at, modified_at, first_name, last_name, mobile_phone, email, practice_id, role, org_role, is_active, invited_by, avatar_url, whatsapp_notifications_enabled, terms_agreed_at, deleted_at FROM users WHERE id = $1
 `
