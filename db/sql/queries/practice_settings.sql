@@ -32,6 +32,48 @@ SET
     updated_at                    = NOW()
 WHERE practice_id = sqlc.arg(practice_id);
 
+-- name: PatchPracticeSettings :execrows
+UPDATE practice_settings
+SET
+    dental_history_enabled = CASE
+        WHEN sqlc.arg(set_dental_history_enabled)::boolean THEN sqlc.arg(dental_history_enabled)::boolean
+        ELSE dental_history_enabled
+    END,
+    tmj_history_enabled = CASE
+        WHEN sqlc.arg(set_tmj_history_enabled)::boolean THEN sqlc.arg(tmj_history_enabled)::boolean
+        ELSE tmj_history_enabled
+    END,
+    multiple_locations_enabled = CASE
+        WHEN sqlc.arg(set_multiple_locations_enabled)::boolean THEN sqlc.arg(multiple_locations_enabled)::boolean
+        ELSE multiple_locations_enabled
+    END,
+    available_weekdays = CASE
+        WHEN sqlc.arg(set_available_weekdays)::boolean THEN sqlc.arg(available_weekdays)::smallint[]
+        ELSE available_weekdays
+    END,
+    custom_form_sections = CASE
+        WHEN sqlc.arg(set_custom_form_sections)::boolean THEN sqlc.narg(custom_form_sections)::jsonb
+        ELSE custom_form_sections
+    END,
+    physiotherapy_history_enabled = CASE
+        WHEN sqlc.arg(set_physiotherapy_history_enabled)::boolean THEN sqlc.arg(physiotherapy_history_enabled)::boolean
+        ELSE physiotherapy_history_enabled
+    END,
+    optometry_history_enabled = CASE
+        WHEN sqlc.arg(set_optometry_history_enabled)::boolean THEN sqlc.arg(optometry_history_enabled)::boolean
+        ELSE optometry_history_enabled
+    END,
+    theme = CASE
+        WHEN sqlc.arg(set_theme)::boolean THEN sqlc.arg(theme)::text
+        ELSE theme
+    END,
+    theme_colors = CASE
+        WHEN sqlc.arg(set_theme)::boolean THEN sqlc.narg(theme_colors)::jsonb
+        ELSE theme_colors
+    END,
+    updated_at = NOW()
+WHERE practice_id = sqlc.arg(practice_id);
+
 
 -- name: GetPracticeSettings :one
 SELECT * FROM practice_settings

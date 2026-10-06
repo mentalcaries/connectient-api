@@ -57,3 +57,17 @@ SET
     modified_at = NOW()
 WHERE id = sqlc.arg(id)
 RETURNING *;
+
+-- name: PatchPracticeSettingsPractice :execrows
+UPDATE practices
+SET
+    specialty = CASE
+        WHEN sqlc.arg(set_specialty)::boolean THEN sqlc.narg(specialty)::text
+        ELSE specialty
+    END,
+    has_multiple_providers = CASE
+        WHEN sqlc.arg(set_has_multiple_providers)::boolean THEN sqlc.arg(has_multiple_providers)::boolean
+        ELSE has_multiple_providers
+    END,
+    modified_at = NOW()
+WHERE id = sqlc.arg(id);

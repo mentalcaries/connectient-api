@@ -274,6 +274,43 @@ func (q *Queries) GetPractices(ctx context.Context) ([]Practice, error) {
 	return items, nil
 }
 
+const patchPracticeSettingsPractice = `-- name: PatchPracticeSettingsPractice :execrows
+UPDATE practices
+SET
+    specialty = CASE
+        WHEN $1::boolean THEN $2::text
+        ELSE specialty
+    END,
+    has_multiple_providers = CASE
+        WHEN $3::boolean THEN $4::boolean
+        ELSE has_multiple_providers
+    END,
+    modified_at = NOW()
+WHERE id = $5
+`
+
+type PatchPracticeSettingsPracticeParams struct {
+	SetSpecialty            bool
+	Specialty               *string
+	SetHasMultipleProviders bool
+	HasMultipleProviders    bool
+	ID                      uuid.UUID
+}
+
+func (q *Queries) PatchPracticeSettingsPractice(ctx context.Context, arg PatchPracticeSettingsPracticeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, patchPracticeSettingsPractice,
+		arg.SetSpecialty,
+		arg.Specialty,
+		arg.SetHasMultipleProviders,
+		arg.HasMultipleProviders,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updatePractice = `-- name: UpdatePractice :one
 UPDATE practices
 SET

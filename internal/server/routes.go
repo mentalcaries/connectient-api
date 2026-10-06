@@ -41,6 +41,18 @@ func requireOwner() gin.HandlerFunc {
 	}
 }
 
+func requireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := c.MustGet("user").(AuthUser)
+		if user.Role == nil || (*user.Role != "owner" && *user.Role != "admin") {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func (s *Server) ClaimsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
@@ -95,6 +107,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/settings", s.handlerGetPracticeSettings)
+		authenticated.PATCH("/practices/settings", requireAdmin(), s.handlerPatchPracticeSettings)
 		authenticated.GET("/practices/procedure-types", s.handlerGetPracticeProcedures)
 		authenticated.GET("/practices/connected-apps", requireOwner(), s.handlerGetConnectedApps)
 	}
