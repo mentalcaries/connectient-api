@@ -10,8 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
+	db "github.com/mentalcaries/connectient-api/internal/database"
 )
 
 func MakeToken() string {
@@ -36,7 +38,9 @@ type TokenClaims struct {
 }
 
 var (
-	ErrMissingUserId = errors.New("missing user id")
+	ErrMissingUserId    = errors.New("missing user id")
+	ErrMembershipDenied = errors.New("practice access denied")
+	ErrMembershipLookup = errors.New("membership lookup failed")
 )
 
 func (s *Server) ClaimsFromRequest(c *gin.Context) (TokenClaims, error) {
@@ -78,9 +82,15 @@ func (s *Server) UserFromRequest(c *gin.Context) (AuthUser, error) {
 		return AuthUser{}, err
 	}
 
-	user, err := s.DBQuery.GetUser(c, claims.ID)
+	user, err := s.DBQuery.GetUserAuthorization(c, claims.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AuthUser{}, ErrMembershipDenied
+	}
 	if err != nil {
-		return AuthUser{}, fmt.Errorf("get user: %w", err)
+		return AuthUser{}, fmt.Errorf("%w: %w", ErrMembershipLookup, err)
+	}
+	if !membershipAllowed(user) {
+		return AuthUser{}, ErrMembershipDenied
 	}
 
 	return AuthUser{
@@ -92,6 +102,13 @@ func (s *Server) UserFromRequest(c *gin.Context) (AuthUser, error) {
 		IsActive:   &user.IsActive,
 		DeletedAt:  user.DeletedAt,
 	}, nil
+}
+
+func membershipAllowed(user db.GetUserAuthorizationRow) bool {
+	if !user.IsActive || user.DeletedAt != nil || user.PracticeID == nil || user.IsSuspended || user.Role == nil {
+		return false
+	}
+	return *user.Role == "owner" || *user.Role == "admin" || *user.Role == "staff"
 }
 
 // func (s *Server) UserFromRequest(c *gin.Context) (AuthUser, error) {

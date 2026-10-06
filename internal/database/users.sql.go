@@ -176,6 +176,43 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const getUserAuthorization = `-- name: GetUserAuthorization :one
+SELECT u.id, u.email, u.first_name, u.last_name, u.practice_id,
+       u.role, u.is_active, u.deleted_at, p.is_suspended
+FROM users u
+JOIN practices p ON p.id = u.practice_id
+WHERE u.id = $1
+`
+
+type GetUserAuthorizationRow struct {
+	ID          uuid.UUID
+	Email       *string
+	FirstName   string
+	LastName    string
+	PracticeID  *uuid.UUID
+	Role        *string
+	IsActive    bool
+	DeletedAt   *time.Time
+	IsSuspended bool
+}
+
+func (q *Queries) GetUserAuthorization(ctx context.Context, id uuid.UUID) (GetUserAuthorizationRow, error) {
+	row := q.db.QueryRow(ctx, getUserAuthorization, id)
+	var i GetUserAuthorizationRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.PracticeID,
+		&i.Role,
+		&i.IsActive,
+		&i.DeletedAt,
+		&i.IsSuspended,
+	)
+	return i, err
+}
+
 const getUserWithSubscriptionStatus = `-- name: GetUserWithSubscriptionStatus :one
 SELECT
     u.id, u.created_at, u.modified_at, u.first_name, u.last_name, u.mobile_phone, u.email, u.practice_id, u.role, u.org_role, u.is_active, u.invited_by, u.avatar_url, u.whatsapp_notifications_enabled, u.terms_agreed_at, u.deleted_at,

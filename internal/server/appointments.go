@@ -1,14 +1,15 @@
 package server
 
 import (
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	db "github.com/mentalcaries/connectient-api/internal/database"
 )
 
@@ -141,15 +142,27 @@ func (s *Server) handlerGetConfirmedAppointments(c *gin.Context) {
 }
 
 func (s *Server) handlerGetAppointmentById(c *gin.Context) {
+	user := c.MustGet("user").(AuthUser)
+	if user.PracticeId == nil {
+		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
+		return
+	}
 	id, err := parseId(c, "id")
 	if err != nil {
 		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
 		return
 	}
 
-	dbAppt, err := s.DBQuery.GetAppointmentById(c, id)
-	if err != nil || err == sql.ErrNoRows {
-		respondWithError(c, http.StatusNotFound, "No appointments found", err)
+	dbAppt, err := s.DBQuery.GetAppointmentById(c, db.GetAppointmentByIdParams{
+		ID:         id,
+		PracticeID: *user.PracticeId,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
+		return
+	}
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "Could not get appointment", err)
 		return
 	}
 	c.JSON(http.StatusOK, Appointment{
@@ -231,6 +244,11 @@ func (s *Server) handlerAppointmentsCreate(c *gin.Context) {
 }
 
 func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
+	user := c.MustGet("user").(AuthUser)
+	if user.PracticeId == nil {
+		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
+		return
+	}
 	id, err := parseId(c, "id")
 	if err != nil {
 		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
@@ -245,12 +263,17 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 	}
 	updatedAppt, err := s.DBQuery.UpdateAppointment(c, db.UpdateAppointmentParams{
 		ID:            id,
+		PracticeID:    *user.PracticeId,
 		ScheduledDate: req.ScheduledDate,
 		ScheduledTime: req.ScheduledTime,
 		IsScheduled:   &req.IsScheduled,
 		IsCancelled:   &req.IsCancelled,
 	})
 
+	if errors.Is(err, pgx.ErrNoRows) {
+		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(c, http.StatusInternalServerError, "Could not update appointment", err)
 		return
@@ -278,13 +301,25 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 }
 
 func (s *Server) handlerAppointmentsDelete(c *gin.Context) {
+	user := c.MustGet("user").(AuthUser)
+	if user.PracticeId == nil {
+		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
+		return
+	}
 	id, err := parseId(c, "id")
 	if err != nil {
 		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
 		return
 	}
 
-	deletedAppt, err := s.DBQuery.DeleteAppointment(c, id)
+	deletedAppt, err := s.DBQuery.DeleteAppointment(c, db.DeleteAppointmentParams{
+		ID:         id,
+		PracticeID: *user.PracticeId,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(c, http.StatusInternalServerError, "Could not delete appointment", err)
 		return

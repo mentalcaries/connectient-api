@@ -1,4 +1,4 @@
-include .env
+-include .env
 export
 
 # Build the application
@@ -39,11 +39,14 @@ docker-down:
 # Test the application
 test:
 	@echo "Testing..."
-	@go test ./... -v
+	@go test ./... -count=1
 # Integrations Tests for the application
-itest:
+test-integration:
+	@test -n "$$TEST_DATABASE_URL" || { echo "Set TEST_DATABASE_URL to a local connectient_test database (see docs/testing.md)."; exit 1; }
 	@echo "Running integration tests..."
-	@go test ./internal/database -v
+	@go test -tags=integration ./... -count=1
+
+itest: test-integration
 
 # Clean the binary
 clean:
@@ -67,4 +70,4 @@ watch:
             fi; \
         fi
 
-.PHONY: all build run test clean watch docker-run docker-down itest
+.PHONY: all build run test test-integration clean watch docker-run docker-down itest

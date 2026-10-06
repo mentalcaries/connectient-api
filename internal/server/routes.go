@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-contrib/cors"
@@ -12,11 +13,30 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 
 		user, err := s.UserFromRequest(c)
 		if err != nil {
-			respondWithError(c, http.StatusUnauthorized, "authorization required", err)
+			switch {
+			case errors.Is(err, ErrMembershipDenied):
+				respondWithError(c, http.StatusForbidden, "practice access denied", nil)
+			case errors.Is(err, ErrMembershipLookup):
+				respondWithError(c, http.StatusInternalServerError, "could not verify practice access", err)
+			default:
+				respondWithError(c, http.StatusUnauthorized, "authorization required", err)
+			}
 			c.Abort()
 			return
 		}
 		c.Set("user", user)
+		c.Next()
+	}
+}
+
+func requireOwner() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := c.MustGet("user").(AuthUser)
+		if user.Role == nil || *user.Role != "owner" {
+			respondWithError(c, http.StatusForbidden, "owner access required", nil)
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
@@ -68,13 +88,13 @@ func (s *Server) RegisterRoutes() http.Handler {
 	{
 		authenticated.GET("/appointments", s.handlerGetAllAppointments)
 		authenticated.GET("appointments/:id", s.handlerGetAppointmentById)
-		authenticated.PATCH("/appointments", s.handlerAppointmentsUpdate)
+		authenticated.PATCH("/appointments/:id", s.handlerAppointmentsUpdate)
 		authenticated.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
 		authenticated.GET("/appointments/confirmed", s.handlerGetConfirmedAppointments)
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/procedure-types", s.handlerGetPracticeProcedures)
-		authenticated.GET("/practices/connected-apps", s.handlerGetConnectedApps)
+		authenticated.GET("/practices/connected-apps", requireOwner(), s.handlerGetConnectedApps)
 	}
 
 	return router
