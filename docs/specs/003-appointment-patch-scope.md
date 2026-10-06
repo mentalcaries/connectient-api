@@ -14,7 +14,7 @@ failure. Confirm rejected requests leave persisted state unchanged. Reuse the
 existing integration-test local database setup; no Neon/Supabase calls.
 
 ```sh
-ONBOARDING_TEST_DATABASE_URL='postgres://postgres@127.0.0.1:PORT/onboarding_transaction_test?sslmode=disable' go test -tags=integration ./internal/server -run '^TestAppointmentPatch' -count=1 -v
+TEST_DATABASE_URL='postgres://postgres@127.0.0.1:PORT/connectient_test?sslmode=disable' go test -tags=integration ./internal/server -run '^TestAppointmentPatch' -count=1 -v
 go vet -tags=integration ./internal/server
 ```
 

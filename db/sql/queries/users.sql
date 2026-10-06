@@ -24,6 +24,13 @@ SELECT * FROM users;
 -- name: GetUser :one
 SELECT * FROM users WHERE id = sqlc.arg(id);
 
+-- name: GetUserAuthorization :one
+SELECT u.id, u.email, u.first_name, u.last_name, u.practice_id,
+       u.role, u.is_active, u.deleted_at, p.is_suspended
+FROM users u
+JOIN practices p ON p.id = u.practice_id
+WHERE u.id = sqlc.arg(id);
+
 -- name: GetUserWithSubscriptionStatus :one
 SELECT
     u.*,

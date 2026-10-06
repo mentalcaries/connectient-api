@@ -126,9 +126,9 @@ Shutdown DB Container
 make docker-down
 ```
 
-DB Integrations Test:
+Database integration tests (requires local PostgreSQL and `TEST_DATABASE_URL`; see [testing setup](docs/testing.md)):
 ```bash
-make itest
+make test-integration
 ```
 
 Live reload the application:
@@ -136,7 +136,7 @@ Live reload the application:
 make watch
 ```
 
-Run the test suite:
+Run unit tests (no database or Docker required):
 ```bash
 make test
 ```

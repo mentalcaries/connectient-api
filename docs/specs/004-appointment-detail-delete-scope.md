@@ -14,7 +14,7 @@ failure. Assert failed requests leave records unchanged and deletion removes onl
 the authorized target. Use the existing opt-in local integration-test setup.
 
 ```sh
-ONBOARDING_TEST_DATABASE_URL='postgres://postgres@127.0.0.1:PORT/onboarding_transaction_test?sslmode=disable' go test -tags=integration ./internal/server -run '^TestAppointment' -count=1 -v
+TEST_DATABASE_URL='postgres://postgres@127.0.0.1:PORT/connectient_test?sslmode=disable' go test -tags=integration ./internal/server -run '^TestAppointment' -count=1 -v
 go vet -tags=integration ./internal/server
 ```
 
