@@ -94,6 +94,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.GET("/appointments/confirmed", s.handlerGetConfirmedAppointments)
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
+		authenticated.GET("/practices/settings", s.handlerGetPracticeSettings)
 		authenticated.GET("/practices/procedure-types", s.handlerGetPracticeProcedures)
 		authenticated.GET("/practices/connected-apps", requireOwner(), s.handlerGetConnectedApps)
 	}

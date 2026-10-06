@@ -11,6 +11,11 @@ WHERE p.id = sqlc.arg(id);
 SELECT * FROM practices
 WHERE practice_code = sqlc.arg(practice_code);
 
+-- name: GetPracticeSettingsOverview :one
+SELECT id, name, practice_category, specialty, practice_code, city
+FROM practices
+WHERE id = sqlc.arg(id);
+
 -- name: CreatePractice :one
 INSERT INTO practices (name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category)
 VALUES (

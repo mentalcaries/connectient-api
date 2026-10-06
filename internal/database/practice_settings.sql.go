@@ -58,7 +58,7 @@ func (q *Queries) CreatePracticeSettings(ctx context.Context, arg CreatePractice
 }
 
 const getPracticeSettings = `-- name: GetPracticeSettings :one
-SELECT id, created_at, updated_at, practice_id, dental_history_enabled, tmj_history_enabled, multiple_locations_enabled, optometry_history_enabled, physiotherapy_history_enabled, custom_form_sections, theme, theme_colors FROM practice_settings
+SELECT id, created_at, updated_at, practice_id, dental_history_enabled, tmj_history_enabled, multiple_locations_enabled, optometry_history_enabled, physiotherapy_history_enabled, custom_form_sections, theme, theme_colors, available_weekdays FROM practice_settings
 WHERE practice_id = $1
 `
 
@@ -78,6 +78,7 @@ func (q *Queries) GetPracticeSettings(ctx context.Context, practiceID uuid.UUID)
 		&i.CustomFormSections,
 		&i.Theme,
 		&i.ThemeColors,
+		&i.AvailableWeekdays,
 	)
 	return i, err
 }

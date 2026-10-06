@@ -153,14 +153,15 @@ type PracticeInvite struct {
 }
 
 type PracticeLocation struct {
-	ID         uuid.UUID
-	CreatedAt  time.Time
-	DeletedAt  *time.Time
-	PracticeID uuid.UUID
-	Name       string
-	Address    string
-	IsActive   bool
-	SortOrder  int32
+	ID                uuid.UUID
+	CreatedAt         time.Time
+	DeletedAt         *time.Time
+	PracticeID        uuid.UUID
+	Name              string
+	Address           string
+	IsActive          bool
+	SortOrder         int32
+	AvailableWeekdays []int16
 }
 
 type PracticeProvider struct {
@@ -184,6 +185,7 @@ type PracticeSetting struct {
 	CustomFormSections          []byte
 	Theme                       string
 	ThemeColors                 []byte
+	AvailableWeekdays           []int16
 }
 
 type ProcedureType struct {

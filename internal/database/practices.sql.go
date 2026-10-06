@@ -92,7 +92,7 @@ func (q *Queries) CreatePractice(ctx context.Context, arg CreatePracticeParams) 
 }
 
 const getPractice = `-- name: GetPractice :one
-SELECT p.id, p.created_at, p.modified_at, p.name, p.city, p.phone, p.email, p.practice_code, p.logo, p.street_address, p.facebook, p.instagram, p.website, p.has_multiple_providers, p.specialty, p.is_suspended, p.practice_category, p.is_active, s.id, s.created_at, s.updated_at, s.practice_id, s.dental_history_enabled, s.tmj_history_enabled, s.multiple_locations_enabled, s.optometry_history_enabled, s.physiotherapy_history_enabled, s.custom_form_sections, s.theme, s.theme_colors
+SELECT p.id, p.created_at, p.modified_at, p.name, p.city, p.phone, p.email, p.practice_code, p.logo, p.street_address, p.facebook, p.instagram, p.website, p.has_multiple_providers, p.specialty, p.is_suspended, p.practice_category, p.is_active, s.id, s.created_at, s.updated_at, s.practice_id, s.dental_history_enabled, s.tmj_history_enabled, s.multiple_locations_enabled, s.optometry_history_enabled, s.physiotherapy_history_enabled, s.custom_form_sections, s.theme, s.theme_colors, s.available_weekdays
 FROM practices p
 LEFT JOIN practice_settings s ON s.practice_id = p.id
 WHERE p.id = $1
@@ -129,6 +129,7 @@ type GetPracticeRow struct {
 	CustomFormSections          []byte
 	Theme                       *string
 	ThemeColors                 []byte
+	AvailableWeekdays           []int16
 }
 
 func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (GetPracticeRow, error) {
@@ -165,6 +166,7 @@ func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (GetPracticeRow
 		&i.CustomFormSections,
 		&i.Theme,
 		&i.ThemeColors,
+		&i.AvailableWeekdays,
 	)
 	return i, err
 }
@@ -196,6 +198,35 @@ func (q *Queries) GetPracticeByCode(ctx context.Context, practiceCode string) (P
 		&i.IsSuspended,
 		&i.PracticeCategory,
 		&i.IsActive,
+	)
+	return i, err
+}
+
+const getPracticeSettingsOverview = `-- name: GetPracticeSettingsOverview :one
+SELECT id, name, practice_category, specialty, practice_code, city
+FROM practices
+WHERE id = $1
+`
+
+type GetPracticeSettingsOverviewRow struct {
+	ID               uuid.UUID
+	Name             string
+	PracticeCategory string
+	Specialty        *string
+	PracticeCode     string
+	City             string
+}
+
+func (q *Queries) GetPracticeSettingsOverview(ctx context.Context, id uuid.UUID) (GetPracticeSettingsOverviewRow, error) {
+	row := q.db.QueryRow(ctx, getPracticeSettingsOverview, id)
+	var i GetPracticeSettingsOverviewRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PracticeCategory,
+		&i.Specialty,
+		&i.PracticeCode,
+		&i.City,
 	)
 	return i, err
 }
