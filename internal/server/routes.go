@@ -112,6 +112,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.POST("/practices/locations", requireAdmin(), s.handlerCreatePracticeLocation)
 		authenticated.PATCH("/practices/locations/:id", requireAdmin(), s.handlerPatchPracticeLocation)
 		authenticated.GET("/practices/procedure-types", s.handlerGetPracticeProcedures)
+		authenticated.POST("/practices/procedure-types", requireAdmin(), s.handlerCreateProcedureType)
+		authenticated.PATCH("/practices/procedure-types/:id", requireAdmin(), s.handlerPatchProcedureType)
+		authenticated.DELETE("/practices/procedure-types/:id", requireAdmin(), s.handlerDeleteProcedureType)
 		authenticated.GET("/practices/connected-apps", requireOwner(), s.handlerGetConnectedApps)
 	}
 

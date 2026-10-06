@@ -11,6 +11,18 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearPrimaryProcedureType = `-- name: ClearPrimaryProcedureType :exec
+UPDATE procedure_types
+SET is_primary = FALSE
+WHERE practice_id = $1
+  AND is_primary = TRUE
+`
+
+func (q *Queries) ClearPrimaryProcedureType(ctx context.Context, practiceID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearPrimaryProcedureType, practiceID)
+	return err
+}
+
 const createProcedureType = `-- name: CreateProcedureType :one
 INSERT INTO procedure_types (
     practice_id,
@@ -29,7 +41,8 @@ INSERT INTO procedure_types (
     $6,
     $7
 )
-RETURNING id
+RETURNING id, created_at, deleted_at, practice_id, name, value, is_active,
+          is_default, is_primary, sort_order
 `
 
 type CreateProcedureTypeParams struct {
@@ -42,7 +55,7 @@ type CreateProcedureTypeParams struct {
 	SortOrder  int32
 }
 
-func (q *Queries) CreateProcedureType(ctx context.Context, arg CreateProcedureTypeParams) (uuid.UUID, error) {
+func (q *Queries) CreateProcedureType(ctx context.Context, arg CreateProcedureTypeParams) (ProcedureType, error) {
 	row := q.db.QueryRow(ctx, createProcedureType,
 		arg.PracticeID,
 		arg.Name,
@@ -52,12 +65,23 @@ func (q *Queries) CreateProcedureType(ctx context.Context, arg CreateProcedureTy
 		arg.IsPrimary,
 		arg.SortOrder,
 	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	var i ProcedureType
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.PracticeID,
+		&i.Name,
+		&i.Value,
+		&i.IsActive,
+		&i.IsDefault,
+		&i.IsPrimary,
+		&i.SortOrder,
+	)
+	return i, err
 }
 
-const deleteProcedureType = `-- name: DeleteProcedureType :exec
+const deleteProcedureType = `-- name: DeleteProcedureType :execrows
 UPDATE procedure_types
 SET deleted_at = NOW()
 WHERE id = $1
@@ -69,9 +93,50 @@ type DeleteProcedureTypeParams struct {
 	PracticeID uuid.UUID
 }
 
-func (q *Queries) DeleteProcedureType(ctx context.Context, arg DeleteProcedureTypeParams) error {
-	_, err := q.db.Exec(ctx, deleteProcedureType, arg.ID, arg.PracticeID)
-	return err
+func (q *Queries) DeleteProcedureType(ctx context.Context, arg DeleteProcedureTypeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteProcedureType, arg.ID, arg.PracticeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getNextProcedureTypeSortOrder = `-- name: GetNextProcedureTypeSortOrder :one
+SELECT (COALESCE(MAX(sort_order), 0) + 1)::integer
+FROM procedure_types
+WHERE practice_id = $1
+`
+
+func (q *Queries) GetNextProcedureTypeSortOrder(ctx context.Context, practiceID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, getNextProcedureTypeSortOrder, practiceID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getProcedureTypeForMutation = `-- name: GetProcedureTypeForMutation :one
+SELECT id, is_default
+FROM procedure_types
+WHERE id = $1
+  AND practice_id = $2
+  AND deleted_at IS NULL
+`
+
+type GetProcedureTypeForMutationParams struct {
+	ID         uuid.UUID
+	PracticeID uuid.UUID
+}
+
+type GetProcedureTypeForMutationRow struct {
+	ID        uuid.UUID
+	IsDefault bool
+}
+
+func (q *Queries) GetProcedureTypeForMutation(ctx context.Context, arg GetProcedureTypeForMutationParams) (GetProcedureTypeForMutationRow, error) {
+	row := q.db.QueryRow(ctx, getProcedureTypeForMutation, arg.ID, arg.PracticeID)
+	var i GetProcedureTypeForMutationRow
+	err := row.Scan(&i.ID, &i.IsDefault)
+	return i, err
 }
 
 const getProcedureTypesByPracticeID = `-- name: GetProcedureTypesByPracticeID :many
@@ -112,31 +177,61 @@ func (q *Queries) GetProcedureTypesByPracticeID(ctx context.Context, practiceID 
 	return items, nil
 }
 
-const updateProcedureType = `-- name: UpdateProcedureType :exec
-UPDATE procedure_types
-SET
-    name       = COALESCE($1, name),
-    is_active  = COALESCE($2, is_active),
-    sort_order = COALESCE($3, sort_order)
-WHERE id = $4
-AND practice_id = $5
+const lockPracticeForProcedureTypeSort = `-- name: LockPracticeForProcedureTypeSort :one
+SELECT id
+FROM practices
+WHERE id = $1
+FOR UPDATE
 `
 
-type UpdateProcedureTypeParams struct {
-	Name       *string
-	IsActive   *bool
-	SortOrder  *int32
-	ID         uuid.UUID
-	PracticeID uuid.UUID
+func (q *Queries) LockPracticeForProcedureTypeSort(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockPracticeForProcedureTypeSort, id)
+	err := row.Scan(&id)
+	return id, err
 }
 
-func (q *Queries) UpdateProcedureType(ctx context.Context, arg UpdateProcedureTypeParams) error {
-	_, err := q.db.Exec(ctx, updateProcedureType,
+const patchProcedureType = `-- name: PatchProcedureType :execrows
+UPDATE procedure_types
+SET name = CASE
+        WHEN $1::boolean THEN $2::text
+        ELSE name
+    END,
+    is_active = CASE
+        WHEN $3::boolean THEN $4::boolean
+        ELSE is_active
+    END,
+    sort_order = CASE
+        WHEN $5::boolean THEN $6::integer
+        ELSE sort_order
+    END
+WHERE id = $7
+AND practice_id = $8
+`
+
+type PatchProcedureTypeParams struct {
+	SetName      bool
+	Name         string
+	SetIsActive  bool
+	IsActive     bool
+	SetSortOrder bool
+	SortOrder    int32
+	ID           uuid.UUID
+	PracticeID   uuid.UUID
+}
+
+func (q *Queries) PatchProcedureType(ctx context.Context, arg PatchProcedureTypeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, patchProcedureType,
+		arg.SetName,
 		arg.Name,
+		arg.SetIsActive,
 		arg.IsActive,
+		arg.SetSortOrder,
 		arg.SortOrder,
 		arg.ID,
 		arg.PracticeID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

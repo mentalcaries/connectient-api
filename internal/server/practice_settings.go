@@ -122,19 +122,6 @@ func practiceSettingsDetails(settings db.PracticeSetting) PracticeSettingsDetail
 	}
 }
 
-func procedureTypeResponses(rows []db.ProcedureType) []ProcedureType {
-	result := make([]ProcedureType, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, ProcedureType{
-			ID: row.ID, CreatedAt: row.CreatedAt, DeletedAt: row.DeletedAt,
-			PracticeID: row.PracticeID, Name: row.Name, Value: row.Value,
-			IsActive: row.IsActive, IsDefault: row.IsDefault, IsPrimary: row.IsPrimary,
-			SortOrder: int(row.SortOrder),
-		})
-	}
-	return result
-}
-
 func practiceLocationResponses(rows []db.PracticeLocation) []PracticeSettingsLocation {
 	result := make([]PracticeSettingsLocation, 0, len(rows))
 	for _, row := range rows {
