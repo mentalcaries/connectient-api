@@ -168,6 +168,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.GET("/connected-apps", requireOwner(), s.handlerGetConnectedApps)
 		authenticated.GET("/connected-apps/google/auth", requireOwner(), s.handlerGoogleCalendarAuth)
 		authenticated.DELETE("/connected-apps/google", requireOwner(), s.handlerDeleteGoogleCalendar)
+		authenticated.GET("/export/appointments", requireAdmin(), s.handlerExportAppointments)
+		authenticated.GET("/export/registrations", requireAdmin(), s.handlerExportRegistrations)
 	}
 
 	return router

@@ -65,6 +65,15 @@ type ConnectedApp struct {
 	AppCalendarID         *string
 }
 
+type DataExportAuditLog struct {
+	ID               uuid.UUID
+	PracticeID       uuid.UUID
+	ExportedByUserID uuid.UUID
+	ExportType       string
+	RowCount         int32
+	ExportedAt       pgtype.Timestamptz
+}
+
 type GoogleOauthState struct {
 	State      string
 	PracticeID uuid.UUID
