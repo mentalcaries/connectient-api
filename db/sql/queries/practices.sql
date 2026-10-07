@@ -16,6 +16,13 @@ SELECT id, name, practice_category, specialty, practice_code, city
 FROM practices
 WHERE id = sqlc.arg(id);
 
+-- name: GetPracticeProfile :one
+SELECT id, name, logo, city, street_address, phone, email, website,
+       practice_code, instagram, facebook, has_multiple_providers,
+       practice_category, specialty
+FROM practices
+WHERE id = sqlc.arg(id);
+
 -- name: CreatePractice :one
 INSERT INTO practices (name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category)
 VALUES (
@@ -70,4 +77,30 @@ SET
         ELSE has_multiple_providers
     END,
     modified_at = NOW()
+WHERE id = sqlc.arg(id);
+
+-- name: UpdatePracticeProfile :execrows
+UPDATE practices
+SET
+    name = sqlc.arg(name),
+    street_address = sqlc.arg(street_address),
+    city = sqlc.arg(city),
+    phone = sqlc.arg(phone),
+    email = sqlc.arg(email),
+    website = sqlc.arg(website),
+    practice_code = sqlc.arg(practice_code),
+    facebook = sqlc.arg(facebook),
+    instagram = sqlc.arg(instagram),
+    specialty = sqlc.arg(specialty),
+    has_multiple_providers = sqlc.arg(has_multiple_providers),
+    logo = CASE
+        WHEN sqlc.arg(set_logo)::boolean THEN sqlc.narg(logo)::text
+        ELSE logo
+    END,
+    modified_at = NOW()
+WHERE id = sqlc.arg(id);
+
+-- name: UpdatePracticeCode :execrows
+UPDATE practices
+SET practice_code = sqlc.arg(practice_code), modified_at = NOW()
 WHERE id = sqlc.arg(id);

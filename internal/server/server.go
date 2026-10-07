@@ -17,6 +17,7 @@ type Server struct {
 	port    int
 	db      database.Service
 	DBQuery *database.Queries
+	storage ObjectStorage
 }
 
 func NewServer() *http.Server {
@@ -31,6 +32,7 @@ func NewServer() *http.Server {
 		port:    port,
 		db:      db,
 		DBQuery: database.New(db.Pool()),
+		storage: newR2ObjectStorageFromEnv(),
 	}
 
 	server := &http.Server{

@@ -202,6 +202,53 @@ func (q *Queries) GetPracticeByCode(ctx context.Context, practiceCode string) (P
 	return i, err
 }
 
+const getPracticeProfile = `-- name: GetPracticeProfile :one
+SELECT id, name, logo, city, street_address, phone, email, website,
+       practice_code, instagram, facebook, has_multiple_providers,
+       practice_category, specialty
+FROM practices
+WHERE id = $1
+`
+
+type GetPracticeProfileRow struct {
+	ID                   uuid.UUID
+	Name                 string
+	Logo                 *string
+	City                 string
+	StreetAddress        *string
+	Phone                *string
+	Email                *string
+	Website              *string
+	PracticeCode         string
+	Instagram            *string
+	Facebook             *string
+	HasMultipleProviders bool
+	PracticeCategory     string
+	Specialty            *string
+}
+
+func (q *Queries) GetPracticeProfile(ctx context.Context, id uuid.UUID) (GetPracticeProfileRow, error) {
+	row := q.db.QueryRow(ctx, getPracticeProfile, id)
+	var i GetPracticeProfileRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Logo,
+		&i.City,
+		&i.StreetAddress,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.PracticeCode,
+		&i.Instagram,
+		&i.Facebook,
+		&i.HasMultipleProviders,
+		&i.PracticeCategory,
+		&i.Specialty,
+	)
+	return i, err
+}
+
 const getPracticeSettingsOverview = `-- name: GetPracticeSettingsOverview :one
 SELECT id, name, practice_category, specialty, practice_code, city
 FROM practices
@@ -394,4 +441,85 @@ func (q *Queries) UpdatePractice(ctx context.Context, arg UpdatePracticeParams) 
 		&i.IsActive,
 	)
 	return i, err
+}
+
+const updatePracticeCode = `-- name: UpdatePracticeCode :execrows
+UPDATE practices
+SET practice_code = $1, modified_at = NOW()
+WHERE id = $2
+`
+
+type UpdatePracticeCodeParams struct {
+	PracticeCode string
+	ID           uuid.UUID
+}
+
+func (q *Queries) UpdatePracticeCode(ctx context.Context, arg UpdatePracticeCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePracticeCode, arg.PracticeCode, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updatePracticeProfile = `-- name: UpdatePracticeProfile :execrows
+UPDATE practices
+SET
+    name = $1,
+    street_address = $2,
+    city = $3,
+    phone = $4,
+    email = $5,
+    website = $6,
+    practice_code = $7,
+    facebook = $8,
+    instagram = $9,
+    specialty = $10,
+    has_multiple_providers = $11,
+    logo = CASE
+        WHEN $12::boolean THEN $13::text
+        ELSE logo
+    END,
+    modified_at = NOW()
+WHERE id = $14
+`
+
+type UpdatePracticeProfileParams struct {
+	Name                 string
+	StreetAddress        *string
+	City                 string
+	Phone                *string
+	Email                *string
+	Website              *string
+	PracticeCode         string
+	Facebook             *string
+	Instagram            *string
+	Specialty            *string
+	HasMultipleProviders bool
+	SetLogo              bool
+	Logo                 *string
+	ID                   uuid.UUID
+}
+
+func (q *Queries) UpdatePracticeProfile(ctx context.Context, arg UpdatePracticeProfileParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePracticeProfile,
+		arg.Name,
+		arg.StreetAddress,
+		arg.City,
+		arg.Phone,
+		arg.Email,
+		arg.Website,
+		arg.PracticeCode,
+		arg.Facebook,
+		arg.Instagram,
+		arg.Specialty,
+		arg.HasMultipleProviders,
+		arg.SetLogo,
+		arg.Logo,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
