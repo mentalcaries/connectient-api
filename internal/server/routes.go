@@ -89,6 +89,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		public.POST("/registrations/form/:token", s.handlerSubmitPublicRegistrationForm)
 		public.GET("/invite/validate", s.handlerValidateInvite)
 		public.GET("/connected-apps/google/callback", s.handlerGoogleCalendarCallback)
+		public.POST("/internal/auth/membership", s.handlerInternalMembershipLookup)
 
 	}
 
