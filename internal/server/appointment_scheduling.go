@@ -156,7 +156,9 @@ type scheduleAppointmentInput struct {
 	ProviderID              uuid.UUID
 	AcknowledgedConflictIDs []uuid.UUID
 	IsConfirmed             bool
+	SendEmail               *bool
 	SendWhatsApp            *bool
+	NotifyEmail             *string
 	NotifyPhone             *string
 	Timezone                string
 }
@@ -241,7 +243,9 @@ func decodeScheduleAppointment(body io.Reader) (scheduleAppointmentInput, error)
 		ProviderID              string                  `json:"providerId"`
 		AcknowledgedConflictIDs optionalStringListInput `json:"acknowledgedConflictIds"`
 		IsConfirmed             optionalBoolInput       `json:"isConfirmed"`
+		SendEmail               optionalBoolInput       `json:"sendEmail"`
 		SendWhatsApp            optionalBoolInput       `json:"sendWhatsApp"`
+		NotifyEmail             optionalStringInput     `json:"notifyEmail"`
 		NotifyPhone             optionalStringInput     `json:"notifyPhone"`
 		Timezone                optionalStringInput     `json:"timezone"`
 	}
@@ -277,9 +281,21 @@ func decodeScheduleAppointment(body io.Reader) (scheduleAppointmentInput, error)
 		value := wire.SendWhatsApp.Value
 		input.SendWhatsApp = &value
 	}
+	if wire.SendEmail.Set {
+		value := wire.SendEmail.Value
+		input.SendEmail = &value
+	}
+	email, err := validateOptionalEmail(optionalStringPointer(wire.NotifyEmail))
+	if err != nil {
+		return scheduleAppointmentInput{}, err
+	}
+	input.NotifyEmail = email
 	if wire.NotifyPhone.Set {
 		value := wire.NotifyPhone.Value
 		input.NotifyPhone = &value
+	}
+	if input.SendEmail != nil && *input.SendEmail && input.NotifyEmail == nil {
+		return scheduleAppointmentInput{}, errors.New("email required")
 	}
 	if _, err := validateScheduleValues(input.ScheduledDate, input.ScheduledTime, input.DurationMinutes); err != nil {
 		return scheduleAppointmentInput{}, err

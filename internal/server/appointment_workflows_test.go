@@ -67,6 +67,19 @@ func TestDecodeAppointmentSchedulingCommands(t *testing.T) {
 	if !schedule.Location.Set || schedule.Location.Value != nil || !schedule.AppointmentType.Set || schedule.AppointmentType.Value != nil {
 		t.Errorf("nullable update state lost: %+v", schedule)
 	}
+	schedule, err = decodeScheduleAppointment(strings.NewReader(`{
+		"scheduledDate":"2026-10-08","scheduledTime":"08:00","durationMinutes":15,
+		"providerId":"` + providerID + `","sendEmail":true,"notifyEmail":" PATIENT@EXAMPLE.TEST "
+	}`))
+	if err != nil || schedule.SendEmail == nil || !*schedule.SendEmail || schedule.NotifyEmail == nil || *schedule.NotifyEmail != "patient@example.test" {
+		t.Fatalf("schedule email command: %+v err=%v", schedule, err)
+	}
+	if _, err := decodeScheduleAppointment(strings.NewReader(`{
+		"scheduledDate":"2026-10-08","scheduledTime":"08:00","durationMinutes":15,
+		"providerId":"` + providerID + `","sendEmail":true
+	}`)); err == nil {
+		t.Fatal("expected requested schedule email without address to fail")
+	}
 }
 
 func TestDecodeConfirmAppointment(t *testing.T) {

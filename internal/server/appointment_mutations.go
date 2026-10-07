@@ -105,6 +105,13 @@ func (s *Server) handlerScheduleAppointment(c *gin.Context) {
 		return
 	}
 	s.runAppointmentScheduledEffects(c, result, input)
+	if input.IsConfirmed && input.SendEmail != nil && *input.SendEmail {
+		notification := appointmentNotification(result.Appointment)
+		if input.NotifyEmail != nil {
+			notification.Email = *input.NotifyEmail
+		}
+		_ = s.sendAppointmentEmail(c, notification)
+	}
 	if input.IsConfirmed && (input.SendWhatsApp == nil || *input.SendWhatsApp) {
 		phone := result.Previous.MobilePhone
 		if input.NotifyPhone != nil && *input.NotifyPhone != "" {

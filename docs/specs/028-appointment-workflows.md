@@ -32,6 +32,12 @@ interfaces. Missing providers report `unavailable` where the wire contract expos
 delivery results and never attempt outbound traffic. Concrete delivery/calendar
 providers remain part of their dedicated resource slices.
 
+Scheduling also accepts optional `sendEmail` and `notifyEmail`. A requested email
+requires a valid explicit address and is sent only when the scheduling command
+confirms the appointment. This consolidates the legacy Next.js follow-up action in
+the authenticated, tenant-scoped Go command and prevents duplicate delivery during
+caller cutover.
+
 Migration 031 reconciles the legacy Go appointment table with staff creation by
 allowing null request dates, appointment types, and legacy bearer tokens, and adds
 the missing `created_by` user foreign key.
@@ -48,3 +54,7 @@ the missing `created_by` user foreign key.
   orphaned `created_by` values. Migration 031 was applied and verified: Goose is at
   31, all three compatibility columns are nullable, and the audit foreign key is
   present.
+- During Next.js caller cutover, schedule-email parity was rechecked and moved into
+  the Go scheduling command. Decoder coverage, `make test`, the full disposable
+  PostgreSQL integration suite, integration-tag vet, gofmt, and diff checks pass.
+  No additional migration is required; isolated Neon remains at Goose 34.
