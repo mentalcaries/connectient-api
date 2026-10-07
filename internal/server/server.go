@@ -40,6 +40,7 @@ func NewServer() *http.Server {
 	queries := database.New(db.Pool())
 	notifications := newOutboundNotificationProvider(queries)
 	calendar := newGoogleCalendarService(db, queries)
+	realtime := newRealtimeAppointmentService()
 
 	AppServer := &Server{
 		port:                port,
@@ -50,7 +51,7 @@ func NewServer() *http.Server {
 		teamInviteNotify:    notifications,
 		appointmentNotify:   notifications,
 		publicBookingNotify: notifications,
-		appointmentEvents:   calendar,
+		appointmentEvents:   &appointmentEventFanout{calendar: calendar, realtime: realtime},
 		googleCalendar:      calendar,
 		patientBaseURL:      strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
 		inviteBaseURL:       strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),
