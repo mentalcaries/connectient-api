@@ -87,6 +87,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 		public.GET("/public/practices/:code/booking-config", s.handlerGetPublicBookingConfig)
 		public.GET("/public/practices/:code/procedure-types", s.handlerGetPublicProcedureTypes)
 		public.GET("/public/practices/:code/locations", s.handlerGetPublicLocations)
+		public.GET("/registrations/form/:token", s.handlerGetPublicRegistrationForm)
+		public.POST("/registrations/form/:token", s.handlerSubmitPublicRegistrationForm)
 
 	}
 

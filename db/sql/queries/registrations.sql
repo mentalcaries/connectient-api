@@ -128,3 +128,96 @@ FROM patient_registrations
 WHERE id = sqlc.arg(id)
   AND practice_id = sqlc.arg(practice_id)
   AND deleted_at IS NULL;
+
+-- name: GetPublicRegistrationBootstrap :one
+SELECT
+    r.id, r.practice_id, r.appointment_id, r.status, r.token_expires_at,
+    p.name AS practice_name, p.logo AS practice_logo,
+    p.practice_category, p.is_active, p.is_suspended,
+    ps.dental_history_enabled, ps.tmj_history_enabled,
+    ps.physiotherapy_history_enabled, ps.optometry_history_enabled,
+    ps.custom_form_sections, ps.theme, ps.theme_colors,
+    a.first_name, a.last_name, a.email, a.mobile_phone,
+    s.status AS subscription_status, s.plan AS subscription_plan,
+    s."trialEnd" AS subscription_trial_end,
+    s."periodEnd" AS subscription_period_end,
+    s."cancelAt" AS subscription_cancel_at
+FROM patient_registrations r
+JOIN practices p ON p.id = r.practice_id
+LEFT JOIN practice_settings ps ON ps.practice_id = r.practice_id
+LEFT JOIN appointments a
+  ON a.id = r.appointment_id AND a.practice_id = r.practice_id AND a.deleted_at IS NULL
+LEFT JOIN subscription s ON s."referenceId" = r.practice_id::text
+WHERE r.token = sqlc.arg(token)
+  AND r.deleted_at IS NULL;
+
+-- name: MarkRegistrationExpired :execrows
+UPDATE patient_registrations
+SET status = 'expired'
+WHERE id = sqlc.arg(id)
+  AND deleted_at IS NULL
+  AND status <> 'completed';
+
+-- name: LockPublicRegistration :one
+SELECT r.id, r.practice_id, r.status, r.token_expires_at,
+       p.is_active, p.is_suspended,
+       s.status AS subscription_status, s.plan AS subscription_plan,
+       s."trialEnd" AS subscription_trial_end,
+       s."periodEnd" AS subscription_period_end,
+       s."cancelAt" AS subscription_cancel_at
+FROM patient_registrations r
+JOIN practices p ON p.id = r.practice_id
+LEFT JOIN subscription s ON s."referenceId" = r.practice_id::text
+WHERE r.token = sqlc.arg(token)
+  AND r.deleted_at IS NULL
+FOR UPDATE OF r;
+
+-- name: FindRegistrationPatientByEmail :one
+SELECT id FROM patients
+WHERE practice_id = sqlc.arg(practice_id)
+  AND email = sqlc.arg(email)
+  AND first_name ILIKE sqlc.arg(first_name)
+  AND last_name ILIKE sqlc.arg(last_name)
+LIMIT 1;
+
+-- name: FindRegistrationPatientByPhone :one
+SELECT id FROM patients
+WHERE practice_id = sqlc.arg(practice_id)
+  AND mobile_phone = sqlc.arg(mobile_phone)
+  AND first_name ILIKE sqlc.arg(first_name)
+  AND last_name ILIKE sqlc.arg(last_name)
+LIMIT 1;
+
+-- name: CreateRegistrationPatient :one
+INSERT INTO patients (
+    practice_id, first_name, last_name, email, mobile_phone
+) VALUES (
+    sqlc.arg(practice_id), sqlc.arg(first_name), sqlc.arg(last_name),
+    sqlc.narg(email), sqlc.narg(mobile_phone)
+)
+RETURNING id;
+
+-- name: EnrichRegistrationPatient :execrows
+UPDATE patients
+SET home_phone = sqlc.narg(home_phone),
+    date_of_birth = sqlc.arg(date_of_birth),
+    address_line_1 = sqlc.narg(address_line_1),
+    address_line_2 = sqlc.narg(address_line_2),
+    city = sqlc.narg(city),
+    email_consent = sqlc.arg(email_consent),
+    emergency_contact_name = sqlc.narg(emergency_contact_name),
+    emergency_contact_phone = sqlc.narg(emergency_contact_phone),
+    updated_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id);
+
+-- name: InsertPatientRegistrationData :exec
+INSERT INTO patient_registration_data (registration_id, form_version, form_data)
+VALUES (sqlc.arg(registration_id), sqlc.arg(form_version), sqlc.arg(form_data));
+
+-- name: CompletePatientRegistration :execrows
+UPDATE patient_registrations
+SET patient_id = sqlc.arg(patient_id), status = 'completed', completed_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND status <> 'completed'
+  AND deleted_at IS NULL;

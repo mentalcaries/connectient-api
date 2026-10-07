@@ -10,7 +10,29 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const completePatientRegistration = `-- name: CompletePatientRegistration :execrows
+UPDATE patient_registrations
+SET patient_id = $1, status = 'completed', completed_at = NOW()
+WHERE id = $2
+  AND status <> 'completed'
+  AND deleted_at IS NULL
+`
+
+type CompletePatientRegistrationParams struct {
+	PatientID *uuid.UUID
+	ID        uuid.UUID
+}
+
+func (q *Queries) CompletePatientRegistration(ctx context.Context, arg CompletePatientRegistrationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completePatientRegistration, arg.PatientID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
 
 const createPatientRegistration = `-- name: CreatePatientRegistration :one
 INSERT INTO patient_registrations (
@@ -59,6 +81,226 @@ func (q *Queries) CreatePatientRegistration(ctx context.Context, arg CreatePatie
 		&i.Token,
 		&i.TokenExpiresAt,
 		&i.Status,
+	)
+	return i, err
+}
+
+const createRegistrationPatient = `-- name: CreateRegistrationPatient :one
+INSERT INTO patients (
+    practice_id, first_name, last_name, email, mobile_phone
+) VALUES (
+    $1, $2, $3,
+    $4, $5
+)
+RETURNING id
+`
+
+type CreateRegistrationPatientParams struct {
+	PracticeID  uuid.UUID
+	FirstName   string
+	LastName    string
+	Email       *string
+	MobilePhone *string
+}
+
+func (q *Queries) CreateRegistrationPatient(ctx context.Context, arg CreateRegistrationPatientParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createRegistrationPatient,
+		arg.PracticeID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.MobilePhone,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const enrichRegistrationPatient = `-- name: EnrichRegistrationPatient :execrows
+UPDATE patients
+SET home_phone = $1,
+    date_of_birth = $2,
+    address_line_1 = $3,
+    address_line_2 = $4,
+    city = $5,
+    email_consent = $6,
+    emergency_contact_name = $7,
+    emergency_contact_phone = $8,
+    updated_at = NOW()
+WHERE id = $9
+  AND practice_id = $10
+`
+
+type EnrichRegistrationPatientParams struct {
+	HomePhone             *string
+	DateOfBirth           *time.Time
+	AddressLine1          *string
+	AddressLine2          *string
+	City                  *string
+	EmailConsent          bool
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ID                    uuid.UUID
+	PracticeID            uuid.UUID
+}
+
+func (q *Queries) EnrichRegistrationPatient(ctx context.Context, arg EnrichRegistrationPatientParams) (int64, error) {
+	result, err := q.db.Exec(ctx, enrichRegistrationPatient,
+		arg.HomePhone,
+		arg.DateOfBirth,
+		arg.AddressLine1,
+		arg.AddressLine2,
+		arg.City,
+		arg.EmailConsent,
+		arg.EmergencyContactName,
+		arg.EmergencyContactPhone,
+		arg.ID,
+		arg.PracticeID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const findRegistrationPatientByEmail = `-- name: FindRegistrationPatientByEmail :one
+SELECT id FROM patients
+WHERE practice_id = $1
+  AND email = $2
+  AND first_name ILIKE $3
+  AND last_name ILIKE $4
+LIMIT 1
+`
+
+type FindRegistrationPatientByEmailParams struct {
+	PracticeID uuid.UUID
+	Email      *string
+	FirstName  string
+	LastName   string
+}
+
+func (q *Queries) FindRegistrationPatientByEmail(ctx context.Context, arg FindRegistrationPatientByEmailParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findRegistrationPatientByEmail,
+		arg.PracticeID,
+		arg.Email,
+		arg.FirstName,
+		arg.LastName,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const findRegistrationPatientByPhone = `-- name: FindRegistrationPatientByPhone :one
+SELECT id FROM patients
+WHERE practice_id = $1
+  AND mobile_phone = $2
+  AND first_name ILIKE $3
+  AND last_name ILIKE $4
+LIMIT 1
+`
+
+type FindRegistrationPatientByPhoneParams struct {
+	PracticeID  uuid.UUID
+	MobilePhone *string
+	FirstName   string
+	LastName    string
+}
+
+func (q *Queries) FindRegistrationPatientByPhone(ctx context.Context, arg FindRegistrationPatientByPhoneParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findRegistrationPatientByPhone,
+		arg.PracticeID,
+		arg.MobilePhone,
+		arg.FirstName,
+		arg.LastName,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getPublicRegistrationBootstrap = `-- name: GetPublicRegistrationBootstrap :one
+SELECT
+    r.id, r.practice_id, r.appointment_id, r.status, r.token_expires_at,
+    p.name AS practice_name, p.logo AS practice_logo,
+    p.practice_category, p.is_active, p.is_suspended,
+    ps.dental_history_enabled, ps.tmj_history_enabled,
+    ps.physiotherapy_history_enabled, ps.optometry_history_enabled,
+    ps.custom_form_sections, ps.theme, ps.theme_colors,
+    a.first_name, a.last_name, a.email, a.mobile_phone,
+    s.status AS subscription_status, s.plan AS subscription_plan,
+    s."trialEnd" AS subscription_trial_end,
+    s."periodEnd" AS subscription_period_end,
+    s."cancelAt" AS subscription_cancel_at
+FROM patient_registrations r
+JOIN practices p ON p.id = r.practice_id
+LEFT JOIN practice_settings ps ON ps.practice_id = r.practice_id
+LEFT JOIN appointments a
+  ON a.id = r.appointment_id AND a.practice_id = r.practice_id AND a.deleted_at IS NULL
+LEFT JOIN subscription s ON s."referenceId" = r.practice_id::text
+WHERE r.token = $1
+  AND r.deleted_at IS NULL
+`
+
+type GetPublicRegistrationBootstrapRow struct {
+	ID                          uuid.UUID
+	PracticeID                  uuid.UUID
+	AppointmentID               *uuid.UUID
+	Status                      string
+	TokenExpiresAt              time.Time
+	PracticeName                string
+	PracticeLogo                *string
+	PracticeCategory            string
+	IsActive                    bool
+	IsSuspended                 bool
+	DentalHistoryEnabled        *bool
+	TmjHistoryEnabled           *bool
+	PhysiotherapyHistoryEnabled *bool
+	OptometryHistoryEnabled     *bool
+	CustomFormSections          []byte
+	Theme                       *string
+	ThemeColors                 []byte
+	FirstName                   *string
+	LastName                    *string
+	Email                       *string
+	MobilePhone                 *string
+	SubscriptionStatus          *string
+	SubscriptionPlan            *string
+	SubscriptionTrialEnd        pgtype.Timestamptz
+	SubscriptionPeriodEnd       pgtype.Timestamptz
+	SubscriptionCancelAt        pgtype.Timestamptz
+}
+
+func (q *Queries) GetPublicRegistrationBootstrap(ctx context.Context, token string) (GetPublicRegistrationBootstrapRow, error) {
+	row := q.db.QueryRow(ctx, getPublicRegistrationBootstrap, token)
+	var i GetPublicRegistrationBootstrapRow
+	err := row.Scan(
+		&i.ID,
+		&i.PracticeID,
+		&i.AppointmentID,
+		&i.Status,
+		&i.TokenExpiresAt,
+		&i.PracticeName,
+		&i.PracticeLogo,
+		&i.PracticeCategory,
+		&i.IsActive,
+		&i.IsSuspended,
+		&i.DentalHistoryEnabled,
+		&i.TmjHistoryEnabled,
+		&i.PhysiotherapyHistoryEnabled,
+		&i.OptometryHistoryEnabled,
+		&i.CustomFormSections,
+		&i.Theme,
+		&i.ThemeColors,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.MobilePhone,
+		&i.SubscriptionStatus,
+		&i.SubscriptionPlan,
+		&i.SubscriptionTrialEnd,
+		&i.SubscriptionPeriodEnd,
+		&i.SubscriptionCancelAt,
 	)
 	return i, err
 }
@@ -238,6 +480,22 @@ func (q *Queries) GetRegistrationForLink(ctx context.Context, arg GetRegistratio
 	return i, err
 }
 
+const insertPatientRegistrationData = `-- name: InsertPatientRegistrationData :exec
+INSERT INTO patient_registration_data (registration_id, form_version, form_data)
+VALUES ($1, $2, $3)
+`
+
+type InsertPatientRegistrationDataParams struct {
+	RegistrationID uuid.UUID
+	FormVersion    string
+	FormData       []byte
+}
+
+func (q *Queries) InsertPatientRegistrationData(ctx context.Context, arg InsertPatientRegistrationDataParams) error {
+	_, err := q.db.Exec(ctx, insertPatientRegistrationData, arg.RegistrationID, arg.FormVersion, arg.FormData)
+	return err
+}
+
 const listRegistrations = `-- name: ListRegistrations :many
 SELECT id, patient_name, patient_email, patient_phone, status, sent_at,
        completed_at, appointment_id, created_at, token
@@ -297,6 +555,70 @@ func (q *Queries) ListRegistrations(ctx context.Context, arg ListRegistrationsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPublicRegistration = `-- name: LockPublicRegistration :one
+SELECT r.id, r.practice_id, r.status, r.token_expires_at,
+       p.is_active, p.is_suspended,
+       s.status AS subscription_status, s.plan AS subscription_plan,
+       s."trialEnd" AS subscription_trial_end,
+       s."periodEnd" AS subscription_period_end,
+       s."cancelAt" AS subscription_cancel_at
+FROM patient_registrations r
+JOIN practices p ON p.id = r.practice_id
+LEFT JOIN subscription s ON s."referenceId" = r.practice_id::text
+WHERE r.token = $1
+  AND r.deleted_at IS NULL
+FOR UPDATE OF r
+`
+
+type LockPublicRegistrationRow struct {
+	ID                    uuid.UUID
+	PracticeID            uuid.UUID
+	Status                string
+	TokenExpiresAt        time.Time
+	IsActive              bool
+	IsSuspended           bool
+	SubscriptionStatus    *string
+	SubscriptionPlan      *string
+	SubscriptionTrialEnd  pgtype.Timestamptz
+	SubscriptionPeriodEnd pgtype.Timestamptz
+	SubscriptionCancelAt  pgtype.Timestamptz
+}
+
+func (q *Queries) LockPublicRegistration(ctx context.Context, token string) (LockPublicRegistrationRow, error) {
+	row := q.db.QueryRow(ctx, lockPublicRegistration, token)
+	var i LockPublicRegistrationRow
+	err := row.Scan(
+		&i.ID,
+		&i.PracticeID,
+		&i.Status,
+		&i.TokenExpiresAt,
+		&i.IsActive,
+		&i.IsSuspended,
+		&i.SubscriptionStatus,
+		&i.SubscriptionPlan,
+		&i.SubscriptionTrialEnd,
+		&i.SubscriptionPeriodEnd,
+		&i.SubscriptionCancelAt,
+	)
+	return i, err
+}
+
+const markRegistrationExpired = `-- name: MarkRegistrationExpired :execrows
+UPDATE patient_registrations
+SET status = 'expired'
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND status <> 'completed'
+`
+
+func (q *Queries) MarkRegistrationExpired(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markRegistrationExpired, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const markRegistrationSent = `-- name: MarkRegistrationSent :execrows
