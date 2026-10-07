@@ -62,3 +62,36 @@ SELECT i.id, i.first_name, i.last_name, i.email, i.role, i.org_role,
 FROM practice_invites i
 JOIN practices p ON p.id = i.practice_id
 WHERE i.token = sqlc.arg(token);
+
+-- name: GetInviteAcceptanceTarget :one
+SELECT practice_id
+FROM practice_invites
+WHERE token = sqlc.arg(token);
+
+-- name: LockInviteAcceptance :one
+SELECT id, practice_id, email, role, org_role, invited_by,
+       token_expires_at, accepted_at
+FROM practice_invites
+WHERE token = sqlc.arg(token)
+FOR UPDATE;
+
+-- name: GetIdentityMembershipForUpdate :one
+SELECT id, practice_id, email, first_name, last_name, is_active, deleted_at
+FROM users
+WHERE id = sqlc.arg(id)
+FOR UPDATE;
+
+-- name: CreateInvitedMembership :exec
+INSERT INTO users (
+    id, practice_id, email, first_name, last_name, mobile_phone,
+    org_role, role, invited_by, is_active, terms_agreed_at
+) VALUES (
+    sqlc.arg(id), sqlc.arg(practice_id), sqlc.arg(email),
+    sqlc.arg(first_name), sqlc.arg(last_name), sqlc.narg(mobile_phone),
+    sqlc.narg(org_role), sqlc.arg(role), sqlc.arg(invited_by), TRUE, NOW()
+);
+
+-- name: MarkInviteAccepted :execrows
+UPDATE practice_invites
+SET accepted_at = NOW()
+WHERE id = sqlc.arg(id) AND accepted_at IS NULL;

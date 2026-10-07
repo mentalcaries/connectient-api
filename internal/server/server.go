@@ -21,6 +21,7 @@ type Server struct {
 	storage            ObjectStorage
 	registrationNotify RegistrationNotifier
 	teamInviteNotify   TeamInviteNotifier
+	identityProfiles   IdentityProfileService
 	patientBaseURL     string
 	inviteBaseURL      string
 }
@@ -34,12 +35,13 @@ func NewServer() *http.Server {
 	db := database.NewDb()
 
 	AppServer := &Server{
-		port:           port,
-		db:             db,
-		DBQuery:        database.New(db.Pool()),
-		storage:        newR2ObjectStorageFromEnv(),
-		patientBaseURL: strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
-		inviteBaseURL:  strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),
+		port:             port,
+		db:               db,
+		DBQuery:          database.New(db.Pool()),
+		storage:          newR2ObjectStorageFromEnv(),
+		patientBaseURL:   strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
+		inviteBaseURL:    strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),
+		identityProfiles: newHTTPIdentityProfileServiceFromEnv(),
 	}
 
 	server := &http.Server{

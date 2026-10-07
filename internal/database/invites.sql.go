@@ -12,6 +12,44 @@ import (
 	"github.com/google/uuid"
 )
 
+const createInvitedMembership = `-- name: CreateInvitedMembership :exec
+INSERT INTO users (
+    id, practice_id, email, first_name, last_name, mobile_phone,
+    org_role, role, invited_by, is_active, terms_agreed_at
+) VALUES (
+    $1, $2, $3,
+    $4, $5, $6,
+    $7, $8, $9, TRUE, NOW()
+)
+`
+
+type CreateInvitedMembershipParams struct {
+	ID          uuid.UUID
+	PracticeID  *uuid.UUID
+	Email       *string
+	FirstName   string
+	LastName    string
+	MobilePhone *string
+	OrgRole     *string
+	Role        *string
+	InvitedBy   *uuid.UUID
+}
+
+func (q *Queries) CreateInvitedMembership(ctx context.Context, arg CreateInvitedMembershipParams) error {
+	_, err := q.db.Exec(ctx, createInvitedMembership,
+		arg.ID,
+		arg.PracticeID,
+		arg.Email,
+		arg.FirstName,
+		arg.LastName,
+		arg.MobilePhone,
+		arg.OrgRole,
+		arg.Role,
+		arg.InvitedBy,
+	)
+	return err
+}
+
 const deletePracticeInvite = `-- name: DeletePracticeInvite :execrows
 DELETE FROM practice_invites
 WHERE id = $1 AND practice_id = $2
@@ -48,6 +86,51 @@ func (q *Queries) FindPracticeUserByEmail(ctx context.Context, arg FindPracticeU
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const getIdentityMembershipForUpdate = `-- name: GetIdentityMembershipForUpdate :one
+SELECT id, practice_id, email, first_name, last_name, is_active, deleted_at
+FROM users
+WHERE id = $1
+FOR UPDATE
+`
+
+type GetIdentityMembershipForUpdateRow struct {
+	ID         uuid.UUID
+	PracticeID *uuid.UUID
+	Email      *string
+	FirstName  string
+	LastName   string
+	IsActive   bool
+	DeletedAt  *time.Time
+}
+
+func (q *Queries) GetIdentityMembershipForUpdate(ctx context.Context, id uuid.UUID) (GetIdentityMembershipForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getIdentityMembershipForUpdate, id)
+	var i GetIdentityMembershipForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.PracticeID,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.IsActive,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getInviteAcceptanceTarget = `-- name: GetInviteAcceptanceTarget :one
+SELECT practice_id
+FROM practice_invites
+WHERE token = $1
+`
+
+func (q *Queries) GetInviteAcceptanceTarget(ctx context.Context, token string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getInviteAcceptanceTarget, token)
+	var practice_id uuid.UUID
+	err := row.Scan(&practice_id)
+	return practice_id, err
 }
 
 const getInviteValidation = `-- name: GetInviteValidation :one
@@ -185,6 +268,55 @@ func (q *Queries) ListPracticeInvites(ctx context.Context, practiceID uuid.UUID)
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockInviteAcceptance = `-- name: LockInviteAcceptance :one
+SELECT id, practice_id, email, role, org_role, invited_by,
+       token_expires_at, accepted_at
+FROM practice_invites
+WHERE token = $1
+FOR UPDATE
+`
+
+type LockInviteAcceptanceRow struct {
+	ID             uuid.UUID
+	PracticeID     uuid.UUID
+	Email          string
+	Role           string
+	OrgRole        *string
+	InvitedBy      uuid.UUID
+	TokenExpiresAt time.Time
+	AcceptedAt     *time.Time
+}
+
+func (q *Queries) LockInviteAcceptance(ctx context.Context, token string) (LockInviteAcceptanceRow, error) {
+	row := q.db.QueryRow(ctx, lockInviteAcceptance, token)
+	var i LockInviteAcceptanceRow
+	err := row.Scan(
+		&i.ID,
+		&i.PracticeID,
+		&i.Email,
+		&i.Role,
+		&i.OrgRole,
+		&i.InvitedBy,
+		&i.TokenExpiresAt,
+		&i.AcceptedAt,
+	)
+	return i, err
+}
+
+const markInviteAccepted = `-- name: MarkInviteAccepted :execrows
+UPDATE practice_invites
+SET accepted_at = NOW()
+WHERE id = $1 AND accepted_at IS NULL
+`
+
+func (q *Queries) MarkInviteAccepted(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markInviteAccepted, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const rotatePracticeInvite = `-- name: RotatePracticeInvite :execrows

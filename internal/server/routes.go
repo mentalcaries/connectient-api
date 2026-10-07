@@ -99,6 +99,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		claimsOnly.POST("/register", s.handlerNewRegistration)
 		claimsOnly.GET("/users/me", s.handlerGetCurrentUser)
 		claimsOnly.GET("/me/context", s.handlerGetCurrentUserContext)
+		claimsOnly.POST("/invite/accept", s.handlerAcceptInvite)
 
 	}
 
