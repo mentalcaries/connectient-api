@@ -12,6 +12,56 @@ import (
 	"github.com/google/uuid"
 )
 
+const cancelAppointment = `-- name: CancelAppointment :one
+UPDATE appointments
+SET is_cancelled = TRUE,
+    modified_at = NOW()
+WHERE id = $1
+  AND practice_id = $2
+  AND is_cancelled IS FALSE
+  AND deleted_at IS NULL
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+`
+
+type CancelAppointmentParams struct {
+	ID         uuid.UUID
+	PracticeID uuid.UUID
+}
+
+func (q *Queries) CancelAppointment(ctx context.Context, arg CancelAppointmentParams) (Appointment, error) {
+	row := q.db.QueryRow(ctx, cancelAppointment, arg.ID, arg.PracticeID)
+	var i Appointment
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.MobilePhone,
+		&i.RequestedDate,
+		&i.RequestedTime,
+		&i.IsEmergency,
+		&i.Description,
+		&i.AppointmentType,
+		&i.IsScheduled,
+		&i.ScheduledDate,
+		&i.ScheduledTime,
+		&i.IsCancelled,
+		&i.DurationMinutes,
+		&i.CreatedBy,
+		&i.ScheduledBy,
+		&i.PracticeID,
+		&i.ProviderID,
+		&i.LocationID,
+		&i.PatientID,
+		&i.Token,
+		&i.DeletedAt,
+		&i.IsConfirmed,
+	)
+	return i, err
+}
+
 const confirmAppointment = `-- name: ConfirmAppointment :one
 UPDATE appointments
 SET is_confirmed = TRUE,
@@ -200,24 +250,6 @@ func (q *Queries) CreateStaffAppointmentPatient(ctx context.Context, arg CreateS
 		&i.MobilePhone,
 	)
 	return i, err
-}
-
-const deleteAppointment = `-- name: DeleteAppointment :one
-DELETE FROM appointments
-WHERE id = $1 AND practice_id = $2
-RETURNING id
-`
-
-type DeleteAppointmentParams struct {
-	ID         uuid.UUID
-	PracticeID uuid.UUID
-}
-
-func (q *Queries) DeleteAppointment(ctx context.Context, arg DeleteAppointmentParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, deleteAppointment, arg.ID, arg.PracticeID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
 }
 
 const findOtherPatientByContact = `-- name: FindOtherPatientByContact :one
@@ -668,9 +700,56 @@ func (q *Queries) ListSchedulingConflicts(ctx context.Context, arg ListSchedulin
 	return items, nil
 }
 
+const lockAppointmentForCancellation = `-- name: LockAppointmentForCancellation :one
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed FROM appointments
+WHERE id = $1
+  AND practice_id = $2
+  AND deleted_at IS NULL
+FOR UPDATE
+`
+
+type LockAppointmentForCancellationParams struct {
+	ID         uuid.UUID
+	PracticeID uuid.UUID
+}
+
+func (q *Queries) LockAppointmentForCancellation(ctx context.Context, arg LockAppointmentForCancellationParams) (Appointment, error) {
+	row := q.db.QueryRow(ctx, lockAppointmentForCancellation, arg.ID, arg.PracticeID)
+	var i Appointment
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.MobilePhone,
+		&i.RequestedDate,
+		&i.RequestedTime,
+		&i.IsEmergency,
+		&i.Description,
+		&i.AppointmentType,
+		&i.IsScheduled,
+		&i.ScheduledDate,
+		&i.ScheduledTime,
+		&i.IsCancelled,
+		&i.DurationMinutes,
+		&i.CreatedBy,
+		&i.ScheduledBy,
+		&i.PracticeID,
+		&i.ProviderID,
+		&i.LocationID,
+		&i.PatientID,
+		&i.Token,
+		&i.DeletedAt,
+		&i.IsConfirmed,
+	)
+	return i, err
+}
+
 const lockAppointmentForScheduling = `-- name: LockAppointmentForScheduling :one
 SELECT id, is_scheduled, practice_id, first_name, last_name, appointment_type,
-       mobile_phone, location_id
+       mobile_phone, location_id, is_cancelled
 FROM appointments
 WHERE id = $1
   AND practice_id = $2
@@ -692,6 +771,7 @@ type LockAppointmentForSchedulingRow struct {
 	AppointmentType *string
 	MobilePhone     string
 	LocationID      *uuid.UUID
+	IsCancelled     bool
 }
 
 func (q *Queries) LockAppointmentForScheduling(ctx context.Context, arg LockAppointmentForSchedulingParams) (LockAppointmentForSchedulingRow, error) {
@@ -706,6 +786,7 @@ func (q *Queries) LockAppointmentForScheduling(ctx context.Context, arg LockAppo
 		&i.AppointmentType,
 		&i.MobilePhone,
 		&i.LocationID,
+		&i.IsCancelled,
 	)
 	return i, err
 }

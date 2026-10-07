@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -161,6 +162,77 @@ func (s *Server) handlerConfirmAppointment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"appointment": appointmentResponse(appointment), "notifications": notifications})
 }
 
+func (s *Server) handlerCancelAppointment(c *gin.Context) {
+	setPrivateNoStore(c)
+	user := c.MustGet("user").(AuthUser)
+	if user.PracticeId == nil {
+		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid appointment ID"})
+		return
+	}
+	if err := decodeEmptyJSONObject(c.Request.Body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cancellation request"})
+		return
+	}
+	appointment, changed, err := s.cancelAppointmentTransaction(c, *user.PracticeId, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Appointment not found"})
+		return
+	}
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "Failed to cancel appointment", err)
+		return
+	}
+	if changed {
+		s.broadcastAppointmentChange(c, appointment.PracticeID, "DELETE", appointment.ID)
+		if s.appointmentEvents != nil {
+			if err := s.appointmentEvents.SyncAppointmentCancelled(c, appointment.PracticeID, appointment.ID); err != nil {
+				log.Printf("appointment calendar cancellation failed for %s: %v", appointment.ID, err)
+			}
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"appointment": appointmentResponse(appointment)})
+}
+
+func decodeEmptyJSONObject(body io.Reader) error {
+	var fields map[string]json.RawMessage
+	if err := decodeStrictJSON(body, &fields); err != nil || fields == nil || len(fields) != 0 {
+		return errors.New("expected empty object")
+	}
+	return nil
+}
+
+func (s *Server) cancelAppointmentTransaction(ctx context.Context, practiceID, id uuid.UUID) (db.Appointment, bool, error) {
+	tx, err := s.db.Pool().Begin(ctx)
+	if err != nil {
+		return db.Appointment{}, false, err
+	}
+	defer tx.Rollback(ctx)
+	queries := s.DBQuery.WithTx(tx)
+	appointment, err := queries.LockAppointmentForCancellation(ctx, db.LockAppointmentForCancellationParams{ID: id, PracticeID: practiceID})
+	if err != nil {
+		return db.Appointment{}, false, err
+	}
+	if appointment.IsCancelled {
+		if err := tx.Commit(ctx); err != nil {
+			return db.Appointment{}, false, err
+		}
+		return appointment, false, nil
+	}
+	appointment, err = queries.CancelAppointment(ctx, db.CancelAppointmentParams{ID: id, PracticeID: practiceID})
+	if err != nil {
+		return db.Appointment{}, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return db.Appointment{}, false, err
+	}
+	return appointment, true, nil
+}
+
 func (s *Server) createStaffAppointmentTransaction(ctx context.Context, user AuthUser, input createStaffAppointmentInput) (staffAppointmentTransactionResult, error) {
 	date, err := validateScheduleValues(input.ScheduledDate, input.ScheduledTime, input.DurationMinutes)
 	if err != nil {
@@ -233,6 +305,9 @@ func (s *Server) scheduleAppointmentTransaction(ctx context.Context, user AuthUs
 	}
 	if err != nil {
 		return scheduleTransactionResult{}, err
+	}
+	if previous.IsCancelled {
+		return scheduleTransactionResult{}, &schedulingError{Status: http.StatusConflict, Message: "Cancelled appointments cannot be scheduled"}
 	}
 	finalLocation := previous.LocationID
 	if input.Location.Set {

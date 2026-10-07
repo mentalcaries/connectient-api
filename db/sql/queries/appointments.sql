@@ -35,10 +35,22 @@ WHERE id = sqlc.arg(id)
   AND deleted_at IS NULL
 RETURNING *;
 
--- name: DeleteAppointment :one
-DELETE FROM appointments
-WHERE id = sqlc.arg(id) AND practice_id = sqlc.arg(practice_id)
-RETURNING id;
+-- name: LockAppointmentForCancellation :one
+SELECT * FROM appointments
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND deleted_at IS NULL
+FOR UPDATE;
+
+-- name: CancelAppointment :one
+UPDATE appointments
+SET is_cancelled = TRUE,
+    modified_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND is_cancelled IS FALSE
+  AND deleted_at IS NULL
+RETURNING *;
 
 -- name: GetPracticeProviderLink :one
 SELECT id FROM practice_provider
@@ -67,7 +79,7 @@ ORDER BY scheduled_date ASC, scheduled_time ASC, id ASC;
 
 -- name: LockAppointmentForScheduling :one
 SELECT id, is_scheduled, practice_id, first_name, last_name, appointment_type,
-       mobile_phone, location_id
+       mobile_phone, location_id, is_cancelled
 FROM appointments
 WHERE id = sqlc.arg(id)
   AND practice_id = sqlc.arg(practice_id)

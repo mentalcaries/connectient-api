@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -148,30 +147,6 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
-}
-
-func (s *Server) handlerAppointmentsDelete(c *gin.Context) {
-	setPrivateNoStore(c)
-	user := c.MustGet("user").(AuthUser)
-	if user.PracticeId == nil {
-		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
-		return
-	}
-	id, err := parseId(c, "id")
-	if err != nil {
-		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
-		return
-	}
-	deletedID, err := s.DBQuery.DeleteAppointment(c, db.DeleteAppointmentParams{ID: id, PracticeID: *user.PracticeId})
-	if errors.Is(err, pgx.ErrNoRows) {
-		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
-		return
-	}
-	if err != nil {
-		respondWithError(c, http.StatusInternalServerError, "Could not delete appointment", err)
-		return
-	}
-	c.JSON(http.StatusOK, fmt.Sprintf("Successfully deleted appointment with id: %v", deletedID))
 }
 
 func decodePatchAppointmentContacts(body io.Reader) (patchAppointmentContactsInput, error) {

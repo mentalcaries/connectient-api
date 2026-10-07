@@ -89,3 +89,14 @@ func TestAppointmentNotifierUnavailable(t *testing.T) {
 		t.Errorf("WhatsApp result = %q", got)
 	}
 }
+
+func TestDecodeEmptyCancellationBody(t *testing.T) {
+	if err := decodeEmptyJSONObject(strings.NewReader(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{"", `null`, `[]`, `{"reason":"changed"}`} {
+		if err := decodeEmptyJSONObject(strings.NewReader(body)); err == nil {
+			t.Errorf("expected invalid cancellation body: %s", body)
+		}
+	}
+}

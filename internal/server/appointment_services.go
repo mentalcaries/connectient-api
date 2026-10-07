@@ -41,4 +41,5 @@ type AppointmentEventService interface {
 	BroadcastAppointmentChange(context.Context, uuid.UUID, string, uuid.UUID) error
 	SyncAppointmentCreated(context.Context, AppointmentEvent) error
 	SyncAppointmentUpdated(context.Context, AppointmentEvent) error
+	SyncAppointmentCancelled(context.Context, uuid.UUID, uuid.UUID) error
 }

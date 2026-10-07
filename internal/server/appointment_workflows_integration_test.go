@@ -48,6 +48,12 @@ func (f *fakeAppointmentServices) SyncAppointmentUpdated(context.Context, Appoin
 	f.calendarUpdates++
 	return nil
 }
+func (f *fakeAppointmentServices) SyncAppointmentCancelled(context.Context, uuid.UUID, uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calendarUpdates++
+	return nil
+}
 func (f *fakeAppointmentServices) SendAppointmentEmail(context.Context, AppointmentNotification) (RegistrationDeliveryResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -174,6 +180,60 @@ func TestAppointmentWorkflowsIntegration(t *testing.T) {
 	if services.calendarCreates != 2 || services.calendarUpdates != 0 || services.broadcasts != 3 || services.emails != 2 || services.whatsApps != 2 {
 		t.Errorf("unexpected side effects: %+v", services)
 	}
+	response = requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+requestID.String()+"/cancel", map[string]any{})
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"is_cancelled":true`) {
+		t.Fatalf("cancel = %d %s", response.Code, response.Body.String())
+	}
+	response = requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+requestID.String()+"/cancel", map[string]any{})
+	if response.Code != http.StatusOK {
+		t.Fatalf("idempotent cancel = %d %s", response.Code, response.Body.String())
+	}
+	if services.calendarUpdates != 1 || services.broadcasts != 4 || services.emails != 2 || services.whatsApps != 2 {
+		t.Errorf("cancellation side effects repeated or notified patient: %+v", services)
+	}
+	response = requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+requestID.String()+"/schedule", scheduleBody)
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "Cancelled appointments cannot be scheduled") {
+		t.Fatalf("cancelled reschedule = %d %s", response.Code, response.Body.String())
+	}
+	otherUser := user
+	otherUser.PracticeId = &otherPracticeID
+	response = requestAppointmentWorkflow(ctx, s, otherUser, http.MethodPost, "/appointments/"+requestID.String()+"/cancel", map[string]any{})
+	if response.Code != http.StatusNotFound {
+		t.Errorf("cross-practice cancel = %d %s", response.Code, response.Body.String())
+	}
+	concurrentCancelID := uuid.New()
+	if _, err := pool.Exec(ctx, `INSERT INTO appointments
+		(id, practice_id, first_name, last_name, email, mobile_phone, is_scheduled, scheduled_date, scheduled_time)
+		VALUES ($1, $2, 'Concurrent', 'Cancel', 'cancel@example.test', '15550000005', TRUE, '2026-10-09', '09:00')`, concurrentCancelID, practiceID); err != nil {
+		t.Fatal(err)
+	}
+	startCancel := make(chan struct{})
+	cancelResponses := make(chan *httptest.ResponseRecorder, 2)
+	for range 2 {
+		go func() {
+			<-startCancel
+			cancelResponses <- requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+concurrentCancelID.String()+"/cancel", map[string]any{})
+		}()
+	}
+	close(startCancel)
+	for range 2 {
+		if concurrentResponse := <-cancelResponses; concurrentResponse.Code != http.StatusOK {
+			t.Errorf("concurrent cancel = %d %s", concurrentResponse.Code, concurrentResponse.Body.String())
+		}
+	}
+	if services.calendarUpdates != 2 || services.broadcasts != 5 {
+		t.Errorf("concurrent cancellation repeated side effects: %+v", services)
+	}
+	deletedID := uuid.New()
+	if _, err := pool.Exec(ctx, `INSERT INTO appointments
+		(id, practice_id, first_name, last_name, email, mobile_phone, deleted_at)
+		VALUES ($1, $2, 'Deleted', 'Request', 'deleted@example.test', '15550000006', NOW())`, deletedID, practiceID); err != nil {
+		t.Fatal(err)
+	}
+	response = requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+deletedID.String()+"/cancel", map[string]any{})
+	if response.Code != http.StatusNotFound {
+		t.Errorf("soft-deleted cancel = %d %s", response.Code, response.Body.String())
+	}
 	if _, err := pool.Exec(ctx, `UPDATE subscription SET status = 'expired', "trialEnd" = NOW() - INTERVAL '31 days' WHERE "referenceId" = $1`, practiceID.String()); err != nil {
 		t.Fatal(err)
 	}
@@ -212,6 +272,7 @@ func requestAppointmentWorkflow(ctx context.Context, s *Server, user AuthUser, m
 	router.POST("/appointments", setUser, s.handlerCreateStaffAppointment)
 	router.POST("/appointments/:id/schedule", setUser, s.handlerScheduleAppointment)
 	router.POST("/appointments/:id/confirm", setUser, s.handlerConfirmAppointment)
+	router.POST("/appointments/:id/cancel", setUser, s.handlerCancelAppointment)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(method, path, bytes.NewReader(payload)).WithContext(ctx)
 	request.Header.Set("Content-Type", "application/json")
