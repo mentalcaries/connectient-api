@@ -127,6 +127,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.PATCH("/account", s.handlerPatchAccount)
 		authenticated.POST("/upload/avatar", s.handlerUploadAvatar)
 		authenticated.DELETE("/upload/avatar", s.handlerDeleteAvatar)
+		authenticated.POST("/upload/logo", requireAdmin(), s.handlerUploadPracticeLogo)
+		authenticated.DELETE("/upload/logo", requireAdmin(), s.handlerDeletePracticeLogo)
 		authenticated.GET("/practices/connected-apps", requireOwner(), s.handlerGetConnectedApps)
 	}
 

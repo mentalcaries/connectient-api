@@ -462,6 +462,25 @@ func (q *Queries) UpdatePracticeCode(ctx context.Context, arg UpdatePracticeCode
 	return result.RowsAffected(), nil
 }
 
+const updatePracticeLogo = `-- name: UpdatePracticeLogo :execrows
+UPDATE practices
+SET logo = $1, modified_at = NOW()
+WHERE id = $2
+`
+
+type UpdatePracticeLogoParams struct {
+	Logo *string
+	ID   uuid.UUID
+}
+
+func (q *Queries) UpdatePracticeLogo(ctx context.Context, arg UpdatePracticeLogoParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePracticeLogo, arg.Logo, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updatePracticeProfile = `-- name: UpdatePracticeProfile :execrows
 UPDATE practices
 SET

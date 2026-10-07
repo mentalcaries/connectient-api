@@ -104,3 +104,8 @@ WHERE id = sqlc.arg(id);
 UPDATE practices
 SET practice_code = sqlc.arg(practice_code), modified_at = NOW()
 WHERE id = sqlc.arg(id);
+
+-- name: UpdatePracticeLogo :execrows
+UPDATE practices
+SET logo = sqlc.narg(logo), modified_at = NOW()
+WHERE id = sqlc.arg(id);
