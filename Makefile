@@ -16,7 +16,8 @@ run:
 
 # Create the DB migrations
 migrate-up:
-	goose -dir db/sql/schema postgres $(DATABASE_URL) up
+	@database_url=$$(printf '%s' "$$DATABASE_URL" | sed 's/^"//;s/"$$//'); \
+		goose -dir db/sql/schema postgres "$$database_url" up
 
 # Create DB container
 docker-run:
