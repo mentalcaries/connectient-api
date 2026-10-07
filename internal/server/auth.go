@@ -93,9 +93,13 @@ func (s *Server) UserFromRequest(c *gin.Context) (AuthUser, error) {
 		return AuthUser{}, ErrMembershipDenied
 	}
 
+	email := user.Email
+	if claims.Email != "" {
+		email = &claims.Email
+	}
 	return AuthUser{
 		ID:         user.ID,
-		Email:      user.Email,
+		Email:      email,
 		Name:       user.FirstName + " " + user.LastName,
 		PracticeId: user.PracticeID,
 		Role:       user.Role,

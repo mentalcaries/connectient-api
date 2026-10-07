@@ -107,6 +107,42 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const getAccount = `-- name: GetAccount :one
+SELECT id, first_name, last_name, mobile_phone, email, practice_id, role,
+       avatar_url, whatsapp_notifications_enabled
+FROM users
+WHERE id = $1
+`
+
+type GetAccountRow struct {
+	ID                           uuid.UUID
+	FirstName                    string
+	LastName                     string
+	MobilePhone                  *string
+	Email                        *string
+	PracticeID                   *uuid.UUID
+	Role                         *string
+	AvatarUrl                    *string
+	WhatsappNotificationsEnabled bool
+}
+
+func (q *Queries) GetAccount(ctx context.Context, id uuid.UUID) (GetAccountRow, error) {
+	row := q.db.QueryRow(ctx, getAccount, id)
+	var i GetAccountRow
+	err := row.Scan(
+		&i.ID,
+		&i.FirstName,
+		&i.LastName,
+		&i.MobilePhone,
+		&i.Email,
+		&i.PracticeID,
+		&i.Role,
+		&i.AvatarUrl,
+		&i.WhatsappNotificationsEnabled,
+	)
+	return i, err
+}
+
 const getAllUsers = `-- name: GetAllUsers :many
 SELECT id, created_at, modified_at, first_name, last_name, mobile_phone, email, practice_id, role, org_role, is_active, invited_by, avatar_url, whatsapp_notifications_enabled, terms_agreed_at, deleted_at FROM users
 `
@@ -387,6 +423,52 @@ func (q *Queries) GetUserWithSubscriptionStatus(ctx context.Context, id uuid.UUI
 		&i.SubscriptionCancelAt,
 	)
 	return i, err
+}
+
+const updateAccount = `-- name: UpdateAccount :execrows
+UPDATE users
+SET
+    first_name = $1,
+    last_name = $2,
+    avatar_url = $3,
+    mobile_phone = CASE
+        WHEN $4::boolean THEN $5::text
+        ELSE mobile_phone
+    END,
+    whatsapp_notifications_enabled = CASE
+        WHEN $6::boolean
+            THEN $7::boolean
+        ELSE whatsapp_notifications_enabled
+    END
+WHERE id = $8
+`
+
+type UpdateAccountParams struct {
+	FirstName                       string
+	LastName                        string
+	AvatarUrl                       *string
+	SetMobilePhone                  bool
+	MobilePhone                     *string
+	SetWhatsappNotificationsEnabled bool
+	WhatsappNotificationsEnabled    bool
+	ID                              uuid.UUID
+}
+
+func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateAccount,
+		arg.FirstName,
+		arg.LastName,
+		arg.AvatarUrl,
+		arg.SetMobilePhone,
+		arg.MobilePhone,
+		arg.SetWhatsappNotificationsEnabled,
+		arg.WhatsappNotificationsEnabled,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateUser = `-- name: UpdateUser :one

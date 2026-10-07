@@ -104,6 +104,29 @@ SET practice_id = sqlc.arg(practice_id)
 WHERE id = sqlc.arg(id)
 RETURNING *;
 
+-- name: GetAccount :one
+SELECT id, first_name, last_name, mobile_phone, email, practice_id, role,
+       avatar_url, whatsapp_notifications_enabled
+FROM users
+WHERE id = sqlc.arg(id);
+
+-- name: UpdateAccount :execrows
+UPDATE users
+SET
+    first_name = sqlc.arg(first_name),
+    last_name = sqlc.arg(last_name),
+    avatar_url = sqlc.narg(avatar_url),
+    mobile_phone = CASE
+        WHEN sqlc.arg(set_mobile_phone)::boolean THEN sqlc.narg(mobile_phone)::text
+        ELSE mobile_phone
+    END,
+    whatsapp_notifications_enabled = CASE
+        WHEN sqlc.arg(set_whatsapp_notifications_enabled)::boolean
+            THEN sqlc.arg(whatsapp_notifications_enabled)::boolean
+        ELSE whatsapp_notifications_enabled
+    END
+WHERE id = sqlc.arg(id);
+
 -- name: DeleteUser :one
 UPDATE users
 SET deleted_at = NOW()
