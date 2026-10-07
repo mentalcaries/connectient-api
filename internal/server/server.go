@@ -36,15 +36,21 @@ func NewServer() *http.Server {
 	}
 
 	db := database.NewDb()
+	queries := database.New(db.Pool())
+	notifications := newOutboundNotificationProvider(queries)
 
 	AppServer := &Server{
-		port:             port,
-		db:               db,
-		DBQuery:          database.New(db.Pool()),
-		storage:          newR2ObjectStorageFromEnv(),
-		patientBaseURL:   strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
-		inviteBaseURL:    strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),
-		identityProfiles: newHTTPIdentityProfileServiceFromEnv(),
+		port:                port,
+		db:                  db,
+		DBQuery:             queries,
+		storage:             newR2ObjectStorageFromEnv(),
+		registrationNotify:  notifications,
+		teamInviteNotify:    notifications,
+		appointmentNotify:   notifications,
+		publicBookingNotify: notifications,
+		patientBaseURL:      strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
+		inviteBaseURL:       strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),
+		identityProfiles:    newHTTPIdentityProfileServiceFromEnv(),
 	}
 
 	server := &http.Server{

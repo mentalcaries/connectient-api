@@ -45,6 +45,7 @@ func (s *Server) handlerSendRegistrationEmail(c *gin.Context) {
 		return
 	}
 	result, deliveryErr := s.sendRegistrationEmail(c, RegistrationNotification{
+		PracticeID:  *user.PracticeId,
 		PatientName: registration.PatientName, PatientEmail: target,
 		PatientPhone: registration.PatientPhone, Link: s.registrationLink(registration.Token),
 	})
@@ -104,6 +105,7 @@ func (s *Server) handlerSendRegistrationWhatsApp(c *gin.Context) {
 		return
 	}
 	result, deliveryErr := s.sendRegistrationWhatsApp(c, RegistrationNotification{
+		PracticeID:  *user.PracticeId,
 		PatientName: registration.PatientName, PatientEmail: registration.PatientEmail,
 		PatientPhone: target, Link: s.registrationLink(registration.Token),
 	})
@@ -152,6 +154,7 @@ func (s *Server) handlerResendRegistration(c *gin.Context) {
 		return
 	}
 	result, deliveryErr := s.sendRegistrationEmail(c, RegistrationNotification{
+		PracticeID:  *user.PracticeId,
 		PatientName: registration.PatientName, PatientEmail: registration.PatientEmail,
 		PatientPhone: registration.PatientPhone, Link: s.registrationLink(newToken),
 	})

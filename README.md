@@ -38,6 +38,20 @@ There are three route tiers:
 DATABASE_URL=          # Neon Postgres connection string
 FRONTEND_BASE_URL=     # Base URL of the Next.js app, used to fetch JWKS for JWT verification
 PORT=                  # Port the server listens on
+RESEND_API_KEY=        # Resend API key for transactional email
+FROM_EMAIL=            # Verified email sender (defaults to noreply@connectient.app)
+EMAIL_SEND_FROM_DOMAIN= # Verified domain used for invitation senders
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=
+TWILIO_WHATSAPP_APPT_TEMPLATE=
+TWILIO_WHATSAPP_CONFIRM_TEMPLATE=
+TWILIO_WHATSAPP_REGISTRATION_TEMPLATE=
+TWILIO_WHATSAPP_REGISTRATION_TEMPLATE_NO_CTA=
+E2E_TEST_MODE=         # true simulates outbound delivery without network access
+OUTBOUND_MESSAGES_DISABLED= # true disables email and WhatsApp
+SKIP_EMAIL=            # true disables email only
+SKIP_WHATSAPP=         # true disables WhatsApp only
 ```
 
 ---

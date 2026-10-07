@@ -24,6 +24,7 @@ const registrationTokenLifetime = 7 * 24 * time.Hour
 var registrationPhonePattern = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
 
 type RegistrationNotification struct {
+	PracticeID   uuid.UUID
 	PatientName  string
 	PatientEmail *string
 	PatientPhone *string
@@ -197,6 +198,7 @@ func (s *Server) handlerCreateRegistration(c *gin.Context) {
 		notificationSent = &sent
 		if s.registrationNotify != nil {
 			notification := RegistrationNotification{
+				PracticeID:  *user.PracticeId,
 				PatientName: input.PatientName, PatientEmail: input.PatientEmail,
 				PatientPhone: input.PatientPhone, Link: link,
 			}
