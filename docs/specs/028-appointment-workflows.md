@@ -9,6 +9,8 @@ Implement the current appointment HTTP contracts as one practice-scoped resource
 - `POST /appointments/:id/schedule`
 - `POST /appointments/:id/confirm`
 
+Public appointment requests are specified separately in spec 029.
+
 All routes require active owner/admin/staff membership. Staff creation additionally
 requires an active (not grace-only) subscription. Contact PATCH only updates trimmed
 appointment email/phone fields. Reads are private/no-store and list newest first.

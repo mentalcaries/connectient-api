@@ -15,17 +15,18 @@ import (
 )
 
 type Server struct {
-	port               int
-	db                 database.Service
-	DBQuery            *database.Queries
-	storage            ObjectStorage
-	registrationNotify RegistrationNotifier
-	teamInviteNotify   TeamInviteNotifier
-	identityProfiles   IdentityProfileService
-	appointmentNotify  AppointmentNotifier
-	appointmentEvents  AppointmentEventService
-	patientBaseURL     string
-	inviteBaseURL      string
+	port                int
+	db                  database.Service
+	DBQuery             *database.Queries
+	storage             ObjectStorage
+	registrationNotify  RegistrationNotifier
+	teamInviteNotify    TeamInviteNotifier
+	identityProfiles    IdentityProfileService
+	appointmentNotify   AppointmentNotifier
+	appointmentEvents   AppointmentEventService
+	publicBookingNotify PublicAppointmentRequestNotifier
+	patientBaseURL      string
+	inviteBaseURL       string
 }
 
 func NewServer() *http.Server {

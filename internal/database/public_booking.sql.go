@@ -7,10 +7,219 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const claimPublicAppointmentIdempotency = `-- name: ClaimPublicAppointmentIdempotency :execrows
+INSERT INTO public_appointment_request_idempotency (
+    practice_id, idempotency_key, request_hash
+) VALUES (
+    $1, $2, $3
+)
+ON CONFLICT (practice_id, idempotency_key) DO NOTHING
+`
+
+type ClaimPublicAppointmentIdempotencyParams struct {
+	PracticeID     uuid.UUID
+	IdempotencyKey string
+	RequestHash    []byte
+}
+
+func (q *Queries) ClaimPublicAppointmentIdempotency(ctx context.Context, arg ClaimPublicAppointmentIdempotencyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimPublicAppointmentIdempotency, arg.PracticeID, arg.IdempotencyKey, arg.RequestHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const completePublicAppointmentIdempotency = `-- name: CompletePublicAppointmentIdempotency :exec
+UPDATE public_appointment_request_idempotency
+SET response_body = $1
+WHERE practice_id = $2
+  AND idempotency_key = $3
+`
+
+type CompletePublicAppointmentIdempotencyParams struct {
+	ResponseBody   []byte
+	PracticeID     uuid.UUID
+	IdempotencyKey string
+}
+
+func (q *Queries) CompletePublicAppointmentIdempotency(ctx context.Context, arg CompletePublicAppointmentIdempotencyParams) error {
+	_, err := q.db.Exec(ctx, completePublicAppointmentIdempotency, arg.ResponseBody, arg.PracticeID, arg.IdempotencyKey)
+	return err
+}
+
+const createPublicAppointmentRequest = `-- name: CreatePublicAppointmentRequest :one
+INSERT INTO appointments (
+    practice_id, patient_id, first_name, last_name, email, mobile_phone,
+    requested_date, requested_time, is_emergency, description,
+    appointment_type, provider_id, location_id, is_scheduled,
+    is_cancelled, is_confirmed
+) VALUES (
+    $1, $2, $3,
+    $4, $5, $6,
+    $7::date, $8,
+    $9, $10, $11,
+    $12, $13, FALSE, FALSE, FALSE
+)
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+`
+
+type CreatePublicAppointmentRequestParams struct {
+	PracticeID      uuid.UUID
+	PatientID       *uuid.UUID
+	FirstName       string
+	LastName        string
+	Email           string
+	MobilePhone     string
+	RequestedDate   time.Time
+	RequestedTime   string
+	IsEmergency     bool
+	Description     *string
+	AppointmentType *string
+	ProviderID      *uuid.UUID
+	LocationID      *uuid.UUID
+}
+
+func (q *Queries) CreatePublicAppointmentRequest(ctx context.Context, arg CreatePublicAppointmentRequestParams) (Appointment, error) {
+	row := q.db.QueryRow(ctx, createPublicAppointmentRequest,
+		arg.PracticeID,
+		arg.PatientID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.MobilePhone,
+		arg.RequestedDate,
+		arg.RequestedTime,
+		arg.IsEmergency,
+		arg.Description,
+		arg.AppointmentType,
+		arg.ProviderID,
+		arg.LocationID,
+	)
+	var i Appointment
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.MobilePhone,
+		&i.RequestedDate,
+		&i.RequestedTime,
+		&i.IsEmergency,
+		&i.Description,
+		&i.AppointmentType,
+		&i.IsScheduled,
+		&i.ScheduledDate,
+		&i.ScheduledTime,
+		&i.IsCancelled,
+		&i.DurationMinutes,
+		&i.CreatedBy,
+		&i.ScheduledBy,
+		&i.PracticeID,
+		&i.ProviderID,
+		&i.LocationID,
+		&i.PatientID,
+		&i.Token,
+		&i.DeletedAt,
+		&i.IsConfirmed,
+	)
+	return i, err
+}
+
+const createPublicBookingPatient = `-- name: CreatePublicBookingPatient :one
+INSERT INTO patients (
+    practice_id, first_name, last_name, email, mobile_phone
+) VALUES (
+    $1, $2, $3,
+    $4, $5
+)
+RETURNING id
+`
+
+type CreatePublicBookingPatientParams struct {
+	PracticeID  uuid.UUID
+	FirstName   string
+	LastName    string
+	Email       *string
+	MobilePhone *string
+}
+
+func (q *Queries) CreatePublicBookingPatient(ctx context.Context, arg CreatePublicBookingPatientParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createPublicBookingPatient,
+		arg.PracticeID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.MobilePhone,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const findPublicBookingPatient = `-- name: FindPublicBookingPatient :one
+SELECT id
+FROM patients
+WHERE practice_id = $1
+  AND lower(first_name) = lower($2)
+  AND lower(last_name) = lower($3)
+  AND (lower(trim(email)) = $4
+    OR regexp_replace(mobile_phone, '\D', '', 'g') = $5)
+ORDER BY created_at ASC, id ASC
+LIMIT 1
+FOR SHARE
+`
+
+type FindPublicBookingPatientParams struct {
+	PracticeID  uuid.UUID
+	FirstName   string
+	LastName    string
+	Email       *string
+	MobilePhone *string
+}
+
+func (q *Queries) FindPublicBookingPatient(ctx context.Context, arg FindPublicBookingPatientParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findPublicBookingPatient,
+		arg.PracticeID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.MobilePhone,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getPublicBookingLocation = `-- name: GetPublicBookingLocation :one
+SELECT available_weekdays
+FROM practice_locations
+WHERE id = $1
+  AND practice_id = $2
+  AND is_active = TRUE
+  AND deleted_at IS NULL
+FOR SHARE
+`
+
+type GetPublicBookingLocationParams struct {
+	ID         uuid.UUID
+	PracticeID uuid.UUID
+}
+
+func (q *Queries) GetPublicBookingLocation(ctx context.Context, arg GetPublicBookingLocationParams) ([]int16, error) {
+	row := q.db.QueryRow(ctx, getPublicBookingLocation, arg.ID, arg.PracticeID)
+	var available_weekdays []int16
+	err := row.Scan(&available_weekdays)
+	return available_weekdays, err
+}
 
 const getPublicBookingPractice = `-- name: GetPublicBookingPractice :one
 SELECT
@@ -131,6 +340,27 @@ func (q *Queries) GetPublicLocations(ctx context.Context, practiceID uuid.UUID) 
 	return items, nil
 }
 
+const getPublicProcedureType = `-- name: GetPublicProcedureType :one
+SELECT value
+FROM procedure_types
+WHERE practice_id = $1
+  AND value = $2
+  AND is_active = TRUE
+  AND deleted_at IS NULL
+`
+
+type GetPublicProcedureTypeParams struct {
+	PracticeID uuid.UUID
+	Value      string
+}
+
+func (q *Queries) GetPublicProcedureType(ctx context.Context, arg GetPublicProcedureTypeParams) (string, error) {
+	row := q.db.QueryRow(ctx, getPublicProcedureType, arg.PracticeID, arg.Value)
+	var value string
+	err := row.Scan(&value)
+	return value, err
+}
+
 const getPublicProcedureTypes = `-- name: GetPublicProcedureTypes :many
 SELECT id, name, value, sort_order, is_primary
 FROM procedure_types
@@ -174,6 +404,27 @@ func (q *Queries) GetPublicProcedureTypes(ctx context.Context, practiceID uuid.U
 	return items, nil
 }
 
+const getPublicProvider = `-- name: GetPublicProvider :one
+SELECT pp.provider_id
+FROM practice_provider pp
+JOIN provider p ON p.id = pp.provider_id
+WHERE pp.practice_id = $1
+  AND pp.provider_id = $2
+FOR SHARE OF pp
+`
+
+type GetPublicProviderParams struct {
+	PracticeID uuid.UUID
+	ProviderID uuid.UUID
+}
+
+func (q *Queries) GetPublicProvider(ctx context.Context, arg GetPublicProviderParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getPublicProvider, arg.PracticeID, arg.ProviderID)
+	var provider_id uuid.UUID
+	err := row.Scan(&provider_id)
+	return provider_id, err
+}
+
 const getPublicProviders = `-- name: GetPublicProviders :many
 SELECT p.id, p.first_name, p.last_name, p.title, p.specialty
 FROM practice_provider pp
@@ -214,4 +465,52 @@ func (q *Queries) GetPublicProviders(ctx context.Context, practiceID uuid.UUID) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPublicAppointmentIdempotency = `-- name: LockPublicAppointmentIdempotency :one
+SELECT request_hash, response_body
+FROM public_appointment_request_idempotency
+WHERE practice_id = $1
+  AND idempotency_key = $2
+FOR UPDATE
+`
+
+type LockPublicAppointmentIdempotencyParams struct {
+	PracticeID     uuid.UUID
+	IdempotencyKey string
+}
+
+type LockPublicAppointmentIdempotencyRow struct {
+	RequestHash  []byte
+	ResponseBody []byte
+}
+
+func (q *Queries) LockPublicAppointmentIdempotency(ctx context.Context, arg LockPublicAppointmentIdempotencyParams) (LockPublicAppointmentIdempotencyRow, error) {
+	row := q.db.QueryRow(ctx, lockPublicAppointmentIdempotency, arg.PracticeID, arg.IdempotencyKey)
+	var i LockPublicAppointmentIdempotencyRow
+	err := row.Scan(&i.RequestHash, &i.ResponseBody)
+	return i, err
+}
+
+const publicBookingContactExists = `-- name: PublicBookingContactExists :one
+SELECT id
+FROM patients
+WHERE practice_id = $1
+  AND (lower(trim(email)) = $2
+    OR regexp_replace(mobile_phone, '\D', '', 'g') = $3)
+LIMIT 1
+FOR SHARE
+`
+
+type PublicBookingContactExistsParams struct {
+	PracticeID  uuid.UUID
+	Email       *string
+	MobilePhone *string
+}
+
+func (q *Queries) PublicBookingContactExists(ctx context.Context, arg PublicBookingContactExistsParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, publicBookingContactExists, arg.PracticeID, arg.Email, arg.MobilePhone)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }

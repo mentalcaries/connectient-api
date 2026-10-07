@@ -73,7 +73,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type"},
+		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "Idempotency-Key"},
 		AllowCredentials: true,
 	}))
 
@@ -84,6 +84,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		public.GET("/public/practices/:code/booking-config", s.handlerGetPublicBookingConfig)
 		public.GET("/public/practices/:code/procedure-types", s.handlerGetPublicProcedureTypes)
 		public.GET("/public/practices/:code/locations", s.handlerGetPublicLocations)
+		public.POST("/public/practices/:code/appointment-requests", s.handlerCreatePublicAppointmentRequest)
 		public.GET("/registrations/form/:token", s.handlerGetPublicRegistrationForm)
 		public.POST("/registrations/form/:token", s.handlerSubmitPublicRegistrationForm)
 		public.GET("/invite/validate", s.handlerValidateInvite)

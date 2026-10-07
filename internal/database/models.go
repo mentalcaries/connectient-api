@@ -223,6 +223,14 @@ type Provider struct {
 	Specialty string
 }
 
+type PublicAppointmentRequestIdempotency struct {
+	PracticeID     uuid.UUID
+	IdempotencyKey string
+	RequestHash    []byte
+	ResponseBody   []byte
+	CreatedAt      pgtype.Timestamptz
+}
+
 type Subscription struct {
 	ID                   uuid.UUID
 	Plan                 string
