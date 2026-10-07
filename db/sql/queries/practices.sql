@@ -11,6 +11,17 @@ WHERE p.id = sqlc.arg(id);
 SELECT * FROM practices
 WHERE practice_code = sqlc.arg(practice_code);
 
+-- name: GetPracticeSubscription :one
+SELECT
+    s.status,
+    s.plan,
+    s."trialEnd" AS trial_end,
+    s."periodEnd" AS period_end,
+    s."cancelAt" AS cancel_at
+FROM practices p
+LEFT JOIN subscription s ON s."referenceId" = p.id::text
+WHERE p.id = sqlc.arg(id);
+
 -- name: GetPracticeSettingsOverview :one
 SELECT id, name, practice_category, specialty, practice_code, city
 FROM practices

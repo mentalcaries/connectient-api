@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createPractice = `-- name: CreatePractice :one
@@ -274,6 +275,39 @@ func (q *Queries) GetPracticeSettingsOverview(ctx context.Context, id uuid.UUID)
 		&i.Specialty,
 		&i.PracticeCode,
 		&i.City,
+	)
+	return i, err
+}
+
+const getPracticeSubscription = `-- name: GetPracticeSubscription :one
+SELECT
+    s.status,
+    s.plan,
+    s."trialEnd" AS trial_end,
+    s."periodEnd" AS period_end,
+    s."cancelAt" AS cancel_at
+FROM practices p
+LEFT JOIN subscription s ON s."referenceId" = p.id::text
+WHERE p.id = $1
+`
+
+type GetPracticeSubscriptionRow struct {
+	Status    *string
+	Plan      *string
+	TrialEnd  pgtype.Timestamptz
+	PeriodEnd pgtype.Timestamptz
+	CancelAt  pgtype.Timestamptz
+}
+
+func (q *Queries) GetPracticeSubscription(ctx context.Context, id uuid.UUID) (GetPracticeSubscriptionRow, error) {
+	row := q.db.QueryRow(ctx, getPracticeSubscription, id)
+	var i GetPracticeSubscriptionRow
+	err := row.Scan(
+		&i.Status,
+		&i.Plan,
+		&i.TrialEnd,
+		&i.PeriodEnd,
+		&i.CancelAt,
 	)
 	return i, err
 }
