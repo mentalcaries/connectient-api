@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -14,10 +15,12 @@ import (
 )
 
 type Server struct {
-	port    int
-	db      database.Service
-	DBQuery *database.Queries
-	storage ObjectStorage
+	port               int
+	db                 database.Service
+	DBQuery            *database.Queries
+	storage            ObjectStorage
+	registrationNotify RegistrationNotifier
+	patientBaseURL     string
 }
 
 func NewServer() *http.Server {
@@ -29,10 +32,11 @@ func NewServer() *http.Server {
 	db := database.NewDb()
 
 	AppServer := &Server{
-		port:    port,
-		db:      db,
-		DBQuery: database.New(db.Pool()),
-		storage: newR2ObjectStorageFromEnv(),
+		port:           port,
+		db:             db,
+		DBQuery:        database.New(db.Pool()),
+		storage:        newR2ObjectStorageFromEnv(),
+		patientBaseURL: strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
 	}
 
 	server := &http.Server{

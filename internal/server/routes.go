@@ -112,6 +112,11 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.PATCH("/patients/:id", s.handlerPatchPatient)
 		authenticated.GET("/patients/:id/appointments", s.handlerGetPatientAppointments)
 		authenticated.GET("/patients/:id/registrations", s.handlerGetLatestPatientRegistration)
+		authenticated.GET("/registrations", s.handlerListRegistrations)
+		authenticated.POST("/registrations", s.handlerCreateRegistration)
+		authenticated.GET("/registrations/:id", s.handlerGetRegistration)
+		authenticated.DELETE("/registrations/:id", requireAdmin(), s.handlerDeleteRegistration)
+		authenticated.GET("/registrations/:id/link", s.handlerGetRegistrationLink)
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/settings", s.handlerGetPracticeSettings)

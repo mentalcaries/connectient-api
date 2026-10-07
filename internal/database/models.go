@@ -99,7 +99,7 @@ type PatientRegistration struct {
 	AppointmentID  *uuid.UUID
 	PatientID      *uuid.UUID
 	PatientName    string
-	PatientEmail   string
+	PatientEmail   *string
 	Token          string
 	TokenExpiresAt time.Time
 	Status         string
@@ -107,6 +107,7 @@ type PatientRegistration struct {
 	SentAt         *time.Time
 	CompletedAt    *time.Time
 	DeletedAt      *time.Time
+	PatientPhone   *string
 }
 
 type PatientRegistrationDatum struct {
