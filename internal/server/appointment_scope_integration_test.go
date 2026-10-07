@@ -121,7 +121,7 @@ func TestAppointmentDetailDeleteScope(t *testing.T) {
 
 func seedAppointmentScope(t *testing.T, ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
-	for _, file := range []string{"003_appointments.sql", "020_appointments_soft_delete.sql"} {
+	for _, file := range []string{"003_appointments.sql", "020_appointments_soft_delete.sql", "027_appointment_confirmation_state.sql"} {
 		data, err := os.ReadFile(filepath.Join("..", "..", "db", "sql", "schema", file))
 		if err != nil {
 			t.Fatal(err)

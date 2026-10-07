@@ -37,7 +37,7 @@ func TestAppointmentPatchIntegration(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			t.Cleanup(cancel)
 			pool := newRegistrationTestPool(t, ctx, config)
-			for _, file := range []string{"003_appointments.sql", "020_appointments_soft_delete.sql"} {
+			for _, file := range []string{"003_appointments.sql", "020_appointments_soft_delete.sql", "027_appointment_confirmation_state.sql"} {
 				data, err := os.ReadFile(filepath.Join("..", "..", "db", "sql", "schema", file))
 				if err != nil {
 					t.Fatal(err)

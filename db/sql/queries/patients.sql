@@ -52,3 +52,24 @@ SET
     updated_at = NOW()
 WHERE id = sqlc.arg(id) AND practice_id = sqlc.arg(practice_id)
 RETURNING *;
+
+-- name: GetPatientAppointments :many
+SELECT
+    id, created_at, modified_at, first_name, last_name, email, mobile_phone,
+    requested_date, requested_time, is_emergency, description, appointment_type,
+    is_scheduled, scheduled_date, scheduled_time, is_confirmed, is_cancelled,
+    duration_minutes, provider_id, location_id, patient_id
+FROM appointments
+WHERE patient_id = sqlc.arg(patient_id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND deleted_at IS NULL
+ORDER BY created_at DESC, id DESC;
+
+-- name: GetLatestPatientRegistration :one
+SELECT id, status, sent_at, completed_at, created_at
+FROM patient_registrations
+WHERE patient_id = sqlc.arg(patient_id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND deleted_at IS NULL
+ORDER BY created_at DESC, id DESC
+LIMIT 1;

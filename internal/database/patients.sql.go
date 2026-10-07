@@ -54,6 +54,42 @@ func (q *Queries) FindDuplicatePatientMobilePhone(ctx context.Context, arg FindD
 	return id, err
 }
 
+const getLatestPatientRegistration = `-- name: GetLatestPatientRegistration :one
+SELECT id, status, sent_at, completed_at, created_at
+FROM patient_registrations
+WHERE patient_id = $1
+  AND practice_id = $2
+  AND deleted_at IS NULL
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+type GetLatestPatientRegistrationParams struct {
+	PatientID  *uuid.UUID
+	PracticeID uuid.UUID
+}
+
+type GetLatestPatientRegistrationRow struct {
+	ID          uuid.UUID
+	Status      string
+	SentAt      *time.Time
+	CompletedAt *time.Time
+	CreatedAt   time.Time
+}
+
+func (q *Queries) GetLatestPatientRegistration(ctx context.Context, arg GetLatestPatientRegistrationParams) (GetLatestPatientRegistrationRow, error) {
+	row := q.db.QueryRow(ctx, getLatestPatientRegistration, arg.PatientID, arg.PracticeID)
+	var i GetLatestPatientRegistrationRow
+	err := row.Scan(
+		&i.ID,
+		&i.Status,
+		&i.SentAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getPatient = `-- name: GetPatient :one
 SELECT id, created_at, updated_at, practice_id, first_name, last_name, email, mobile_phone, home_phone, date_of_birth, address_line_1, address_line_2, city, email_consent, whatsapp_consent, emergency_contact_name, emergency_contact_phone, notes FROM patients
 WHERE id = $1 AND practice_id = $2
@@ -88,6 +124,90 @@ func (q *Queries) GetPatient(ctx context.Context, arg GetPatientParams) (Patient
 		&i.Notes,
 	)
 	return i, err
+}
+
+const getPatientAppointments = `-- name: GetPatientAppointments :many
+SELECT
+    id, created_at, modified_at, first_name, last_name, email, mobile_phone,
+    requested_date, requested_time, is_emergency, description, appointment_type,
+    is_scheduled, scheduled_date, scheduled_time, is_confirmed, is_cancelled,
+    duration_minutes, provider_id, location_id, patient_id
+FROM appointments
+WHERE patient_id = $1
+  AND practice_id = $2
+  AND deleted_at IS NULL
+ORDER BY created_at DESC, id DESC
+`
+
+type GetPatientAppointmentsParams struct {
+	PatientID  *uuid.UUID
+	PracticeID uuid.UUID
+}
+
+type GetPatientAppointmentsRow struct {
+	ID              uuid.UUID
+	CreatedAt       time.Time
+	ModifiedAt      time.Time
+	FirstName       string
+	LastName        string
+	Email           string
+	MobilePhone     string
+	RequestedDate   time.Time
+	RequestedTime   string
+	IsEmergency     bool
+	Description     *string
+	AppointmentType string
+	IsScheduled     bool
+	ScheduledDate   *time.Time
+	ScheduledTime   *string
+	IsConfirmed     bool
+	IsCancelled     bool
+	DurationMinutes *int32
+	ProviderID      *uuid.UUID
+	LocationID      *uuid.UUID
+	PatientID       *uuid.UUID
+}
+
+func (q *Queries) GetPatientAppointments(ctx context.Context, arg GetPatientAppointmentsParams) ([]GetPatientAppointmentsRow, error) {
+	rows, err := q.db.Query(ctx, getPatientAppointments, arg.PatientID, arg.PracticeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPatientAppointmentsRow
+	for rows.Next() {
+		var i GetPatientAppointmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.ModifiedAt,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.MobilePhone,
+			&i.RequestedDate,
+			&i.RequestedTime,
+			&i.IsEmergency,
+			&i.Description,
+			&i.AppointmentType,
+			&i.IsScheduled,
+			&i.ScheduledDate,
+			&i.ScheduledTime,
+			&i.IsConfirmed,
+			&i.IsCancelled,
+			&i.DurationMinutes,
+			&i.ProviderID,
+			&i.LocationID,
+			&i.PatientID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPatients = `-- name: ListPatients :many

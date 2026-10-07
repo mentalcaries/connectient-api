@@ -37,6 +37,7 @@ type Appointment struct {
 	PatientID       *uuid.UUID
 	Token           string
 	DeletedAt       *time.Time
+	IsConfirmed     bool
 }
 
 type AppointmentCalendarEvent struct {

@@ -110,6 +110,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.GET("/patients", s.handlerListPatients)
 		authenticated.GET("/patients/:id", s.handlerGetPatient)
 		authenticated.PATCH("/patients/:id", s.handlerPatchPatient)
+		authenticated.GET("/patients/:id/appointments", s.handlerGetPatientAppointments)
+		authenticated.GET("/patients/:id/registrations", s.handlerGetLatestPatientRegistration)
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/settings", s.handlerGetPracticeSettings)

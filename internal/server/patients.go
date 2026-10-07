@@ -49,6 +49,38 @@ type PatientResponse struct {
 	Notes                 *string   `json:"notes"`
 }
 
+type PatientAppointmentResponse struct {
+	ID              uuid.UUID  `json:"id"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ModifiedAt      time.Time  `json:"modified_at"`
+	FirstName       string     `json:"first_name"`
+	LastName        string     `json:"last_name"`
+	Email           string     `json:"email"`
+	MobilePhone     string     `json:"mobile_phone"`
+	RequestedDate   string     `json:"requested_date"`
+	RequestedTime   string     `json:"requested_time"`
+	IsEmergency     bool       `json:"is_emergency"`
+	Description     *string    `json:"description"`
+	AppointmentType string     `json:"appointment_type"`
+	IsScheduled     bool       `json:"is_scheduled"`
+	ScheduledDate   *string    `json:"scheduled_date"`
+	ScheduledTime   *string    `json:"scheduled_time"`
+	IsConfirmed     bool       `json:"is_confirmed"`
+	IsCancelled     bool       `json:"is_cancelled"`
+	DurationMinutes *int32     `json:"duration_minutes"`
+	ProviderID      *uuid.UUID `json:"provider_id"`
+	LocationID      *uuid.UUID `json:"location_id"`
+	PatientID       *uuid.UUID `json:"patient_id"`
+}
+
+type PatientRegistrationSummary struct {
+	ID          uuid.UUID  `json:"id"`
+	Status      string     `json:"status"`
+	SentAt      *time.Time `json:"sent_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
+
 type patchPatientInput struct {
 	params db.UpdatePatientParams
 }
@@ -61,6 +93,7 @@ func (input patchPatientInput) hasUpdates() bool {
 }
 
 func (s *Server) handlerListPatients(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
 	search := sanitizePatientSearch(c.Query("q"))
 	limit := int32(500)
@@ -86,6 +119,7 @@ func (s *Server) handlerListPatients(c *gin.Context) {
 }
 
 func (s *Server) handlerGetPatient(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
 	patientID, ok := parsePatientID(c)
 	if !ok {
@@ -104,6 +138,7 @@ func (s *Server) handlerGetPatient(c *gin.Context) {
 }
 
 func (s *Server) handlerPatchPatient(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
 	patientID, ok := parsePatientID(c)
 	if !ok {
@@ -160,6 +195,74 @@ func (s *Server) handlerPatchPatient(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"patient": patientResponse(patient)})
+}
+
+func (s *Server) handlerGetPatientAppointments(c *gin.Context) {
+	setPrivateNoStore(c)
+	user := c.MustGet("user").(AuthUser)
+	patientID, ok := parsePatientID(c)
+	if !ok || !s.ensurePatientOwned(c, patientID, *user.PracticeId) {
+		return
+	}
+	rows, err := s.DBQuery.GetPatientAppointments(c, db.GetPatientAppointmentsParams{
+		PatientID: &patientID, PracticeID: *user.PracticeId,
+	})
+	if err != nil {
+		respondPatientError(c, http.StatusInternalServerError, "Failed to fetch patient appointments", err)
+		return
+	}
+	appointments := make([]PatientAppointmentResponse, 0, len(rows))
+	for _, row := range rows {
+		appointments = append(appointments, PatientAppointmentResponse{
+			ID: row.ID, CreatedAt: row.CreatedAt, ModifiedAt: row.ModifiedAt,
+			FirstName: row.FirstName, LastName: row.LastName, Email: row.Email,
+			MobilePhone: row.MobilePhone, RequestedDate: row.RequestedDate.Format("2006-01-02"),
+			RequestedTime: row.RequestedTime, IsEmergency: row.IsEmergency,
+			Description: row.Description, AppointmentType: row.AppointmentType,
+			IsScheduled: row.IsScheduled, ScheduledDate: formatPatientDate(row.ScheduledDate),
+			ScheduledTime: row.ScheduledTime, IsConfirmed: row.IsConfirmed,
+			IsCancelled: row.IsCancelled, DurationMinutes: row.DurationMinutes,
+			ProviderID: row.ProviderID, LocationID: row.LocationID, PatientID: row.PatientID,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": appointments})
+}
+
+func (s *Server) handlerGetLatestPatientRegistration(c *gin.Context) {
+	setPrivateNoStore(c)
+	user := c.MustGet("user").(AuthUser)
+	patientID, ok := parsePatientID(c)
+	if !ok || !s.ensurePatientOwned(c, patientID, *user.PracticeId) {
+		return
+	}
+	row, err := s.DBQuery.GetLatestPatientRegistration(c, db.GetLatestPatientRegistrationParams{
+		PatientID: &patientID, PracticeID: *user.PracticeId,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusOK, gin.H{"data": nil})
+		return
+	}
+	if err != nil {
+		respondPatientError(c, http.StatusInternalServerError, "Failed to fetch patient registration", err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": PatientRegistrationSummary{
+		ID: row.ID, Status: row.Status, SentAt: row.SentAt,
+		CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt,
+	}})
+}
+
+func (s *Server) ensurePatientOwned(c *gin.Context, patientID, practiceID uuid.UUID) bool {
+	_, err := s.DBQuery.GetPatient(c, db.GetPatientParams{ID: patientID, PracticeID: practiceID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		respondPatientError(c, http.StatusNotFound, "Patient not found", nil)
+		return false
+	}
+	if err != nil {
+		respondPatientError(c, http.StatusInternalServerError, "Failed to fetch patient", err)
+		return false
+	}
+	return true
 }
 
 func decodePatchPatient(body io.Reader) (patchPatientInput, error) {
@@ -349,4 +452,8 @@ func respondPatientError(c *gin.Context, status int, message string, err error) 
 		log.Printf("Responding with a %v error: %s", status, message)
 	}
 	c.JSON(status, gin.H{"error": message})
+}
+
+func setPrivateNoStore(c *gin.Context) {
+	c.Header("Cache-Control", "private, no-store")
 }
