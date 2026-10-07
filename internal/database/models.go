@@ -71,6 +71,17 @@ type NotificationLog struct {
 	NotificationType string
 }
 
+type OnboardingProgress struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	WalkthroughKey string
+	SeenAt         pgtype.Timestamptz
+	DismissedAt    pgtype.Timestamptz
+	CompletedAt    pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
 type Patient struct {
 	ID                    uuid.UUID
 	CreatedAt             time.Time

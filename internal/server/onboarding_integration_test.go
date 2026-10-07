@@ -27,7 +27,7 @@ func (d registrationTestDB) Pool() *pgxpool.Pool     { return d.pool }
 func (d registrationTestDB) Close() error            { d.pool.Close(); return nil }
 func (d registrationTestDB) Health() db.HealthStatus { return db.HealthStatus{} }
 
-func TestRegistrationTransaction(t *testing.T) {
+func TestOnboardingTransaction(t *testing.T) {
 	config := registrationTestConfig(t)
 
 	for _, tc := range []struct {
@@ -54,15 +54,44 @@ func TestRegistrationTransaction(t *testing.T) {
 			}
 
 			identity := uuid.New()
-			response := serveRegistration(t, ctx, pool, identity, tc.code)
+			response := serveOnboarding(t, ctx, pool, identity, tc.code)
 			if response.Code != tc.status {
 				t.Fatalf("status %d, want %d: %s", response.Code, tc.status, response.Body.String())
 			}
-			assertRegistrationCounts(t, ctx, pool, tc.status == http.StatusCreated)
+			assertOnboardingCounts(t, ctx, pool, tc.status == http.StatusCreated)
 			if tc.status == http.StatusCreated {
-				assertRegistrationCommitted(t, ctx, pool, identity, response.Body.Bytes())
+				assertOnboardingCommitted(t, ctx, pool, identity, response.Body.Bytes())
 			}
 		})
+	}
+}
+
+func TestOnboardingValidationAndConflicts(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	t.Cleanup(cancel)
+	pool := newRegistrationTestPool(t, ctx, registrationTestConfig(t))
+	identity := uuid.New()
+	body := onboardingFixtureBody("contract-practice", "+15555550101")
+	body["termsAgreed"] = false
+	response := serveOnboardingBody(t, ctx, pool, identity, body)
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "terms_required") {
+		t.Fatalf("terms response = %d %s", response.Code, response.Body.String())
+	}
+	assertOnboardingCounts(t, ctx, pool, false)
+
+	body["termsAgreed"] = true
+	response = serveOnboardingBody(t, ctx, pool, identity, body)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("success response = %d %s", response.Code, response.Body.String())
+	}
+	response = serveOnboardingBody(t, ctx, pool, identity, body)
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "Onboarding already completed") {
+		t.Fatalf("existing identity = %d %s", response.Code, response.Body.String())
+	}
+
+	response = serveOnboardingBody(t, ctx, pool, uuid.New(), onboardingFixtureBody("contract-practice", "+15555550102"))
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "Practice code is already taken") {
+		t.Fatalf("duplicate code = %d %s", response.Code, response.Body.String())
 	}
 }
 
@@ -128,16 +157,13 @@ func newRegistrationTestPool(t *testing.T, ctx context.Context, config *pgxpool.
 	return pool
 }
 
-func serveRegistration(t *testing.T, ctx context.Context, pool *pgxpool.Pool, identity uuid.UUID, code string) *httptest.ResponseRecorder {
+func serveOnboarding(t *testing.T, ctx context.Context, pool *pgxpool.Pool, identity uuid.UUID, code string) *httptest.ResponseRecorder {
 	t.Helper()
-	s := &Server{db: registrationTestDB{pool}, DBQuery: db.New(pool)}
-	router := gin.New()
-	router.POST("/register", func(c *gin.Context) {
-		c.Set("claims", TokenClaims{ID: identity, Email: "fixture@example.test"})
-		s.handlerNewRegistration(c)
-	})
-	// Keep the wire keys explicit so this fixture also checks the existing request contract.
-	body, err := json.Marshal(map[string]any{
+	return serveOnboardingBody(t, ctx, pool, identity, onboardingFixtureBody(code, "+15555550100"))
+}
+
+func onboardingFixtureBody(code, phone string) map[string]any {
+	return map[string]any{
 		"is_solo_provider":  true,
 		"name":              "Transaction Fixture",
 		"practice_category": "dental",
@@ -145,20 +171,32 @@ func serveRegistration(t *testing.T, ctx context.Context, pool *pgxpool.Pool, id
 		"city":              "Test City",
 		"first_name":        "Test",
 		"last_name":         "Owner",
-		"mobile_phone":      "+15555550100",
-		"terms_agreed":      true,
+		"mobile_phone":      phone,
+		"termsAgreed":       true,
+	}
+}
+
+func serveOnboardingBody(t *testing.T, ctx context.Context, pool *pgxpool.Pool, identity uuid.UUID, body map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
+	s := &Server{db: registrationTestDB{pool}, DBQuery: db.New(pool)}
+	router := gin.New()
+	router.POST("/onboarding/complete", func(c *gin.Context) {
+		c.Set("claims", TokenClaims{ID: identity, Email: "fixture@example.test"})
+		s.handlerCompleteOnboarding(c)
 	})
+	// Keep the wire keys explicit so this fixture also checks the request contract.
+	payload, err := json.Marshal(body)
 	if err != nil {
 		t.Fatalf("encode registration fixture: %v", err)
 	}
-	request := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body)).WithContext(ctx)
+	request := httptest.NewRequest(http.MethodPost, "/onboarding/complete", bytes.NewReader(payload)).WithContext(ctx)
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	return response
 }
 
-func assertRegistrationCounts(t *testing.T, ctx context.Context, pool *pgxpool.Pool, committed bool) {
+func assertOnboardingCounts(t *testing.T, ctx context.Context, pool *pgxpool.Pool, committed bool) {
 	t.Helper()
 	for _, record := range []struct {
 		table string
@@ -184,24 +222,25 @@ func assertRegistrationCounts(t *testing.T, ctx context.Context, pool *pgxpool.P
 	}
 }
 
-func assertRegistrationCommitted(t *testing.T, ctx context.Context, pool *pgxpool.Pool, identity uuid.UUID, body []byte) {
+func assertOnboardingCommitted(t *testing.T, ctx context.Context, pool *pgxpool.Pool, identity uuid.UUID, body []byte) {
 	t.Helper()
 	var payload struct {
-		PracticeID uuid.UUID `json:"practiceId"`
-		Message    string    `json:"message"`
+		Success    bool      `json:"success"`
+		PracticeID uuid.UUID `json:"practice_id"`
+		RedirectTo string    `json:"redirect_to"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload.Message != "Successfully created Transaction Fixture" {
-		t.Errorf("unexpected message: %s", payload.Message)
+	if !payload.Success || payload.RedirectTo != "/admin/dashboard" {
+		t.Errorf("unexpected response: %+v", payload)
 	}
 	var linked bool
 	err := pool.QueryRow(ctx, `SELECT EXISTS (
 		SELECT 1 FROM users u JOIN practices p ON p.id = u.practice_id
 		JOIN practice_settings settings ON settings.practice_id = p.id
 		JOIN subscription s ON s."referenceId" = p.id::text
-		WHERE u.id = $1 AND p.id = $2 AND u.role = 'owner'
+		WHERE u.id = $1 AND p.id = $2 AND u.role = 'owner' AND p.email = 'fixture@example.test'
 		AND settings.dental_history_enabled AND s.plan = 'pro' AND s.status = 'trialing'
 		AND s."trialEnd" - s."trialStart" BETWEEN interval '29 days' AND interval '31 days'
 	)`, identity, payload.PracticeID).Scan(&linked)
