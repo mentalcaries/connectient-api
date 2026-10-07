@@ -59,8 +59,8 @@ type publicAppointmentRequestInput struct {
 }
 
 type publicAppointmentRequestResponse struct {
-	Success bool           `json:"success"`
-	Data    appointmentDTO `json:"data"`
+	ID     uuid.UUID `json:"id"`
+	Status string    `json:"status"`
 }
 
 func (s *Server) handlerCreatePublicAppointmentRequest(c *gin.Context) {
@@ -99,17 +99,17 @@ func (s *Server) handlerCreatePublicAppointmentRequest(c *gin.Context) {
 		respondPublicBookingError(c, http.StatusInternalServerError, "Failed to create appointment request", err)
 		return
 	}
-	s.broadcastAppointmentChange(c, practice.ID, "INSERT", payload.Data.ID)
+	s.broadcastAppointmentChange(c, practice.ID, "INSERT", payload.ID)
 	if s.publicBookingNotify != nil {
 		notification := PublicAppointmentRequestNotification{
-			AppointmentID: payload.Data.ID, PracticeID: practice.ID,
+			AppointmentID: payload.ID, PracticeID: practice.ID,
 			PracticeName: practice.Name, PracticeEmail: practice.Email,
 			FirstName: input.FirstName, LastName: input.LastName, Email: input.Email,
 			MobilePhone: input.MobilePhone, RequestedDate: input.RequestedDate,
 			RequestedTime: input.RequestedTime, AppointmentType: input.AppointmentType,
 		}
 		if err := s.publicBookingNotify.NotifyStaffAppointmentRequest(c, notification); err != nil {
-			log.Printf("public appointment staff notification failed for %s: %v", payload.Data.ID, err)
+			log.Printf("public appointment staff notification failed for %s: %v", payload.ID, err)
 		}
 	}
 	c.Data(http.StatusCreated, "application/json; charset=utf-8", response)
@@ -252,7 +252,7 @@ func (s *Server) createPublicAppointmentRequest(ctx context.Context, practice db
 	if err != nil {
 		return nil, false, err
 	}
-	response, err := json.Marshal(publicAppointmentRequestResponse{Success: true, Data: appointmentResponse(appointment)})
+	response, err := json.Marshal(publicAppointmentRequestResponse{ID: appointment.ID, Status: "requested"})
 	if err != nil {
 		return nil, false, err
 	}

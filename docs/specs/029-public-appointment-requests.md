@@ -17,6 +17,8 @@ If contact data belongs to another name, the request remains valid but is left
 unlinked, preserving the current best-effort patient behavior.
 
 Creation, optional patient linking, and idempotency completion are transactional.
+Success returns only `{ id, status: "requested" }`; patient IDs and internal
+appointment state are not exposed publicly.
 Realtime broadcast and trusted staff email/WhatsApp notification are best-effort
 post-commit hooks behind injectable services. No patient cancellation notification
 is introduced.

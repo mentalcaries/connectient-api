@@ -81,7 +81,7 @@ func TestPublicAppointmentRequestIntegration(t *testing.T) {
 	body := publicAppointmentFixture(providerID, locationID)
 
 	response := requestPublicAppointment(t, ctx, s, "booking-practice", "request-0001", body)
-	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), `"success":true`) {
+	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), `"status":"requested"`) {
 		t.Fatalf("create = %d %s", response.Code, response.Body.String())
 	}
 	firstBody := response.Body.String()
