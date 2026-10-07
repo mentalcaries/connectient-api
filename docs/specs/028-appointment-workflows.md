@@ -4,6 +4,7 @@ Implement the current appointment HTTP contracts as one practice-scoped resource
 
 - `GET/POST /appointments`
 - `PATCH /appointments/:id`
+- `POST /appointments/:id/read`
 - `GET /appointments/confirmed`
 - `GET /appointments/availability`
 - `POST /appointments/:id/schedule`
@@ -38,6 +39,11 @@ confirms the appointment. This consolidates the legacy Next.js follow-up action 
 the authenticated, tenant-scoped Go command and prevents duplicate delivery during
 caller cutover.
 
+Opening a request uses the explicit idempotent read command. It sets
+`modified_at` only when currently null, preserving the legacy “new request” badge
+without allowing a browser to write arbitrary audit timestamps or triggering
+notification, calendar, or Realtime side effects.
+
 Migration 031 reconciles the legacy Go appointment table with staff creation by
 allowing null request dates, appointment types, and legacy bearer tokens, and adds
 the missing `created_by` user foreign key.
@@ -58,3 +64,8 @@ the missing `created_by` user foreign key.
   the Go scheduling command. Decoder coverage, `make test`, the full disposable
   PostgreSQL integration suite, integration-tag vet, gofmt, and diff checks pass.
   No additional migration is required; isolated Neon remains at Goose 34.
+- The final caller audit added the tenant-scoped, idempotent mark-read command.
+  Integration coverage verifies repeat calls preserve the original read timestamp,
+  cross-practice access returns 404, and no appointment side-effect service runs.
+  Unit tests, integration-tag vet, SQL generation, and the full disposable
+  PostgreSQL integration suite pass; no migration is required.

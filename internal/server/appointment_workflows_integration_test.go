@@ -157,6 +157,28 @@ func TestAppointmentWorkflowsIntegration(t *testing.T) {
 		VALUES ($1, $2, 'Request', 'Patient', 'request@example.test', '15550000003')`, requestID, practiceID); err != nil {
 		t.Fatal(err)
 	}
+	response = requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+requestID.String()+"/read", map[string]any{})
+	if response.Code != http.StatusOK {
+		t.Fatalf("mark read = %d %s", response.Code, response.Body.String())
+	}
+	var firstReadAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT modified_at FROM appointments WHERE id = $1`, requestID).Scan(&firstReadAt); err != nil {
+		t.Fatal(err)
+	}
+	response = requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+requestID.String()+"/read", map[string]any{})
+	var secondReadAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT modified_at FROM appointments WHERE id = $1`, requestID).Scan(&secondReadAt); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || !secondReadAt.Equal(firstReadAt) {
+		t.Fatalf("idempotent mark read = %d first=%v second=%v", response.Code, firstReadAt, secondReadAt)
+	}
+	otherUser := user
+	otherUser.PracticeId = &otherPracticeID
+	response = requestAppointmentWorkflow(ctx, s, otherUser, http.MethodPost, "/appointments/"+requestID.String()+"/read", map[string]any{})
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("cross-practice mark read = %d %s", response.Code, response.Body.String())
+	}
 	scheduleBody := map[string]any{"scheduledDate": "2026-10-08", "scheduledTime": "08:15", "durationMinutes": 15, "providerId": providerID.String()}
 	response = requestAppointmentWorkflow(ctx, s, user, http.MethodPost, "/appointments/"+requestID.String()+"/schedule", scheduleBody)
 	if response.Code != http.StatusConflict {
@@ -195,8 +217,6 @@ func TestAppointmentWorkflowsIntegration(t *testing.T) {
 	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "Cancelled appointments cannot be scheduled") {
 		t.Fatalf("cancelled reschedule = %d %s", response.Code, response.Body.String())
 	}
-	otherUser := user
-	otherUser.PracticeId = &otherPracticeID
 	response = requestAppointmentWorkflow(ctx, s, otherUser, http.MethodPost, "/appointments/"+requestID.String()+"/cancel", map[string]any{})
 	if response.Code != http.StatusNotFound {
 		t.Errorf("cross-practice cancel = %d %s", response.Code, response.Body.String())
@@ -276,6 +296,7 @@ func requestAppointmentWorkflow(ctx context.Context, s *Server, user AuthUser, m
 	router.POST("/appointments/:id/schedule", setUser, s.handlerScheduleAppointment)
 	router.POST("/appointments/:id/confirm", setUser, s.handlerConfirmAppointment)
 	router.POST("/appointments/:id/cancel", setUser, s.handlerCancelAppointment)
+	router.POST("/appointments/:id/read", setUser, s.handlerMarkAppointmentRead)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(method, path, bytes.NewReader(payload)).WithContext(ctx)
 	request.Header.Set("Content-Type", "application/json")

@@ -25,6 +25,13 @@ WHERE id = sqlc.arg(id)
   AND practice_id = sqlc.arg(practice_id)
   AND deleted_at IS NULL;
 
+-- name: MarkAppointmentRead :execrows
+UPDATE appointments
+SET modified_at = COALESCE(modified_at, NOW())
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND deleted_at IS NULL;
+
 -- name: SoftDeleteAppointment :one
 UPDATE appointments
 SET deleted_at = NOW()

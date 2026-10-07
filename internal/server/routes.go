@@ -114,6 +114,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.GET("/appointments/availability", s.handlerGetAppointmentAvailability)
 		authenticated.GET("/appointments/:id", s.handlerGetAppointmentById)
 		authenticated.PATCH("/appointments/:id", s.handlerAppointmentsUpdate)
+		authenticated.POST("/appointments/:id/read", s.handlerMarkAppointmentRead)
 		authenticated.POST("/appointments/:id/cancel", s.handlerCancelAppointment)
 		authenticated.GET("/appointments/confirmed", s.handlerGetConfirmedAppointments)
 		authenticated.POST("/appointments/:id/schedule", s.handlerScheduleAppointment)

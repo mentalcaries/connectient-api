@@ -833,6 +833,27 @@ func (q *Queries) LockPatientForStaffAppointment(ctx context.Context, arg LockPa
 	return i, err
 }
 
+const markAppointmentRead = `-- name: MarkAppointmentRead :execrows
+UPDATE appointments
+SET modified_at = COALESCE(modified_at, NOW())
+WHERE id = $1
+  AND practice_id = $2
+  AND deleted_at IS NULL
+`
+
+type MarkAppointmentReadParams struct {
+	ID         uuid.UUID
+	PracticeID uuid.UUID
+}
+
+func (q *Queries) MarkAppointmentRead(ctx context.Context, arg MarkAppointmentReadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAppointmentRead, arg.ID, arg.PracticeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const patchAppointmentContacts = `-- name: PatchAppointmentContacts :execrows
 UPDATE appointments
 SET email = CASE WHEN $1::boolean THEN $2::text ELSE email END,

@@ -150,6 +150,28 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+func (s *Server) handlerMarkAppointmentRead(c *gin.Context) {
+	setPrivateNoStore(c)
+	user := c.MustGet("user").(AuthUser)
+	id, err := parseId(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid appointment ID"})
+		return
+	}
+	rows, err := s.DBQuery.MarkAppointmentRead(c, db.MarkAppointmentReadParams{
+		ID: id, PracticeID: *user.PracticeId,
+	})
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "Failed to mark appointment as read", err)
+		return
+	}
+	if rows != 1 {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Appointment not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func decodePatchAppointmentContacts(body io.Reader) (patchAppointmentContactsInput, error) {
 	var fields map[string]json.RawMessage
 	decoder := json.NewDecoder(body)
