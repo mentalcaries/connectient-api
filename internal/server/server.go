@@ -20,7 +20,9 @@ type Server struct {
 	DBQuery            *database.Queries
 	storage            ObjectStorage
 	registrationNotify RegistrationNotifier
+	teamInviteNotify   TeamInviteNotifier
 	patientBaseURL     string
+	inviteBaseURL      string
 }
 
 func NewServer() *http.Server {
@@ -37,6 +39,7 @@ func NewServer() *http.Server {
 		DBQuery:        database.New(db.Pool()),
 		storage:        newR2ObjectStorageFromEnv(),
 		patientBaseURL: strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
+		inviteBaseURL:  strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),
 	}
 
 	server := &http.Server{

@@ -89,6 +89,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		public.GET("/public/practices/:code/locations", s.handlerGetPublicLocations)
 		public.GET("/registrations/form/:token", s.handlerGetPublicRegistrationForm)
 		public.POST("/registrations/form/:token", s.handlerSubmitPublicRegistrationForm)
+		public.GET("/invite/validate", s.handlerValidateInvite)
 
 	}
 
@@ -126,6 +127,10 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.PATCH("/users/:id", requireAdmin(), s.handlerPatchPracticeUser)
 		authenticated.DELETE("/users/:id", requireAdmin(), s.handlerDeletePracticeUser)
 		authenticated.GET("/users/seats", requireAdmin(), s.handlerGetPracticeSeats)
+		authenticated.GET("/users/invites", requireAdmin(), s.handlerListPracticeInvites)
+		authenticated.POST("/users/invites", requireAdmin(), s.handlerCreatePracticeInvite)
+		authenticated.DELETE("/users/invites/:id", requireAdmin(), s.handlerDeletePracticeInvite)
+		authenticated.POST("/users/invites/:id/resend", requireAdmin(), s.handlerResendPracticeInvite)
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/settings", s.handlerGetPracticeSettings)
