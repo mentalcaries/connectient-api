@@ -117,6 +117,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.GET("/registrations/:id", s.handlerGetRegistration)
 		authenticated.DELETE("/registrations/:id", requireAdmin(), s.handlerDeleteRegistration)
 		authenticated.GET("/registrations/:id/link", s.handlerGetRegistrationLink)
+		authenticated.POST("/registrations/:id/send-email", s.handlerSendRegistrationEmail)
+		authenticated.POST("/registrations/:id/send-whatsapp", s.handlerSendRegistrationWhatsApp)
+		authenticated.POST("/registrations/:id/resend", s.handlerResendRegistration)
 
 		authenticated.GET("/practices", s.handlerGetPracticeWithSettings)
 		authenticated.GET("/practices/settings", s.handlerGetPracticeSettings)

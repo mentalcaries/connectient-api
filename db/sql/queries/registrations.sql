@@ -20,7 +20,7 @@ WHERE r.id = sqlc.arg(id)
 
 -- name: GetRegistrationForLink :one
 SELECT id, patient_name, patient_email, patient_phone, status, token,
-       token_expires_at, sent_at
+       token_expires_at, sent_at, appointment_id
 FROM patient_registrations
 WHERE id = sqlc.arg(id)
   AND practice_id = sqlc.arg(practice_id)
@@ -63,6 +63,36 @@ WHERE id = sqlc.arg(id)
   AND deleted_at IS NULL
   AND status <> 'completed';
 
+-- name: UpdateRegistrationEmail :execrows
+UPDATE patient_registrations
+SET patient_email = sqlc.arg(patient_email)
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND deleted_at IS NULL
+  AND status <> 'completed';
+
+-- name: RestoreRegistrationEmail :execrows
+UPDATE patient_registrations
+SET patient_email = sqlc.narg(previous_email)
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND patient_email = sqlc.arg(expected_email);
+
+-- name: UpdateRegistrationPhone :execrows
+UPDATE patient_registrations
+SET patient_phone = sqlc.arg(patient_phone)
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND deleted_at IS NULL
+  AND status <> 'completed';
+
+-- name: RestoreRegistrationPhone :execrows
+UPDATE patient_registrations
+SET patient_phone = sqlc.narg(previous_phone)
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND patient_phone = sqlc.arg(expected_phone);
+
 -- name: RotateRegistrationToken :one
 UPDATE patient_registrations
 SET token = sqlc.arg(token), token_expires_at = sqlc.arg(token_expires_at),
@@ -72,6 +102,16 @@ WHERE id = sqlc.arg(id)
   AND deleted_at IS NULL
   AND status <> 'completed'
 RETURNING token, token_expires_at, status;
+
+-- name: RestoreRegistrationToken :execrows
+UPDATE patient_registrations
+SET token = sqlc.arg(previous_token),
+    token_expires_at = sqlc.arg(previous_token_expires_at),
+    status = sqlc.arg(previous_status),
+    sent_at = sqlc.narg(previous_sent_at)
+WHERE id = sqlc.arg(id)
+  AND practice_id = sqlc.arg(practice_id)
+  AND token = sqlc.arg(expected_token);
 
 -- name: SoftDeleteRegistration :one
 UPDATE patient_registrations

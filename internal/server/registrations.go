@@ -31,9 +31,18 @@ type RegistrationNotification struct {
 }
 
 type RegistrationNotifier interface {
-	SendRegistrationEmail(context.Context, RegistrationNotification) error
-	SendRegistrationWhatsApp(context.Context, RegistrationNotification) error
+	SendRegistrationEmail(context.Context, RegistrationNotification) (RegistrationDeliveryResult, error)
+	SendRegistrationWhatsApp(context.Context, RegistrationNotification) (RegistrationDeliveryResult, error)
 }
+
+type RegistrationDeliveryResult string
+
+const (
+	RegistrationDeliverySent        RegistrationDeliveryResult = "sent"
+	RegistrationDeliverySimulated   RegistrationDeliveryResult = "simulated"
+	RegistrationDeliveryUnavailable RegistrationDeliveryResult = "unavailable"
+	RegistrationDeliveryFailed      RegistrationDeliveryResult = "failed"
+)
 
 type createRegistrationInput struct {
 	AppointmentID *uuid.UUID
@@ -192,12 +201,15 @@ func (s *Server) handlerCreateRegistration(c *gin.Context) {
 				PatientPhone: input.PatientPhone, Link: link,
 			}
 			if input.SendEmail {
-				err = s.registrationNotify.SendRegistrationEmail(c, notification)
+				var result RegistrationDeliveryResult
+				result, err = s.registrationNotify.SendRegistrationEmail(c, notification)
+				sent = err == nil && registrationDeliverySucceeded(result)
 			} else {
-				err = s.registrationNotify.SendRegistrationWhatsApp(c, notification)
+				var result RegistrationDeliveryResult
+				result, err = s.registrationNotify.SendRegistrationWhatsApp(c, notification)
+				sent = err == nil && registrationDeliverySucceeded(result)
 			}
-			if err == nil {
-				sent = true
+			if sent {
 				notificationSent = &sent
 				rows, trackingErr := s.DBQuery.MarkRegistrationSent(c, db.MarkRegistrationSentParams{
 					ID: registration.ID, PracticeID: *user.PracticeId,
@@ -390,6 +402,10 @@ func newRegistrationToken() (string, error) {
 
 func (s *Server) registrationLink(token string) string {
 	return s.patientBaseURL + "/register/" + token
+}
+
+func registrationDeliverySucceeded(result RegistrationDeliveryResult) bool {
+	return result == RegistrationDeliverySent || result == RegistrationDeliverySimulated
 }
 
 func parseRegistrationID(c *gin.Context) (uuid.UUID, bool) {

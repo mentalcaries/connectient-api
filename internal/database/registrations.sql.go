@@ -197,7 +197,7 @@ func (q *Queries) GetRegistrationDuplicate(ctx context.Context, arg GetRegistrat
 
 const getRegistrationForLink = `-- name: GetRegistrationForLink :one
 SELECT id, patient_name, patient_email, patient_phone, status, token,
-       token_expires_at, sent_at
+       token_expires_at, sent_at, appointment_id
 FROM patient_registrations
 WHERE id = $1
   AND practice_id = $2
@@ -218,6 +218,7 @@ type GetRegistrationForLinkRow struct {
 	Token          string
 	TokenExpiresAt time.Time
 	SentAt         *time.Time
+	AppointmentID  *uuid.UUID
 }
 
 func (q *Queries) GetRegistrationForLink(ctx context.Context, arg GetRegistrationForLinkParams) (GetRegistrationForLinkRow, error) {
@@ -232,6 +233,7 @@ func (q *Queries) GetRegistrationForLink(ctx context.Context, arg GetRegistratio
 		&i.Token,
 		&i.TokenExpiresAt,
 		&i.SentAt,
+		&i.AppointmentID,
 	)
 	return i, err
 }
@@ -319,6 +321,99 @@ func (q *Queries) MarkRegistrationSent(ctx context.Context, arg MarkRegistration
 	return result.RowsAffected(), nil
 }
 
+const restoreRegistrationEmail = `-- name: RestoreRegistrationEmail :execrows
+UPDATE patient_registrations
+SET patient_email = $1
+WHERE id = $2
+  AND practice_id = $3
+  AND patient_email = $4
+`
+
+type RestoreRegistrationEmailParams struct {
+	PreviousEmail *string
+	ID            uuid.UUID
+	PracticeID    uuid.UUID
+	ExpectedEmail *string
+}
+
+func (q *Queries) RestoreRegistrationEmail(ctx context.Context, arg RestoreRegistrationEmailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreRegistrationEmail,
+		arg.PreviousEmail,
+		arg.ID,
+		arg.PracticeID,
+		arg.ExpectedEmail,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restoreRegistrationPhone = `-- name: RestoreRegistrationPhone :execrows
+UPDATE patient_registrations
+SET patient_phone = $1
+WHERE id = $2
+  AND practice_id = $3
+  AND patient_phone = $4
+`
+
+type RestoreRegistrationPhoneParams struct {
+	PreviousPhone *string
+	ID            uuid.UUID
+	PracticeID    uuid.UUID
+	ExpectedPhone *string
+}
+
+func (q *Queries) RestoreRegistrationPhone(ctx context.Context, arg RestoreRegistrationPhoneParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreRegistrationPhone,
+		arg.PreviousPhone,
+		arg.ID,
+		arg.PracticeID,
+		arg.ExpectedPhone,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restoreRegistrationToken = `-- name: RestoreRegistrationToken :execrows
+UPDATE patient_registrations
+SET token = $1,
+    token_expires_at = $2,
+    status = $3,
+    sent_at = $4
+WHERE id = $5
+  AND practice_id = $6
+  AND token = $7
+`
+
+type RestoreRegistrationTokenParams struct {
+	PreviousToken          string
+	PreviousTokenExpiresAt time.Time
+	PreviousStatus         string
+	PreviousSentAt         *time.Time
+	ID                     uuid.UUID
+	PracticeID             uuid.UUID
+	ExpectedToken          string
+}
+
+func (q *Queries) RestoreRegistrationToken(ctx context.Context, arg RestoreRegistrationTokenParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreRegistrationToken,
+		arg.PreviousToken,
+		arg.PreviousTokenExpiresAt,
+		arg.PreviousStatus,
+		arg.PreviousSentAt,
+		arg.ID,
+		arg.PracticeID,
+		arg.ExpectedToken,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const rotateRegistrationToken = `-- name: RotateRegistrationToken :one
 UPDATE patient_registrations
 SET token = $1, token_expires_at = $2,
@@ -375,4 +470,50 @@ func (q *Queries) SoftDeleteRegistration(ctx context.Context, arg SoftDeleteRegi
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const updateRegistrationEmail = `-- name: UpdateRegistrationEmail :execrows
+UPDATE patient_registrations
+SET patient_email = $1
+WHERE id = $2
+  AND practice_id = $3
+  AND deleted_at IS NULL
+  AND status <> 'completed'
+`
+
+type UpdateRegistrationEmailParams struct {
+	PatientEmail *string
+	ID           uuid.UUID
+	PracticeID   uuid.UUID
+}
+
+func (q *Queries) UpdateRegistrationEmail(ctx context.Context, arg UpdateRegistrationEmailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateRegistrationEmail, arg.PatientEmail, arg.ID, arg.PracticeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateRegistrationPhone = `-- name: UpdateRegistrationPhone :execrows
+UPDATE patient_registrations
+SET patient_phone = $1
+WHERE id = $2
+  AND practice_id = $3
+  AND deleted_at IS NULL
+  AND status <> 'completed'
+`
+
+type UpdateRegistrationPhoneParams struct {
+	PatientPhone *string
+	ID           uuid.UUID
+	PracticeID   uuid.UUID
+}
+
+func (q *Queries) UpdateRegistrationPhone(ctx context.Context, arg UpdateRegistrationPhoneParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateRegistrationPhone, arg.PatientPhone, arg.ID, arg.PracticeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

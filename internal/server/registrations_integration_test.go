@@ -22,14 +22,14 @@ import (
 
 type fakeRegistrationNotifier struct{ emailCalls, whatsappCalls int }
 
-func (f *fakeRegistrationNotifier) SendRegistrationEmail(context.Context, RegistrationNotification) error {
+func (f *fakeRegistrationNotifier) SendRegistrationEmail(context.Context, RegistrationNotification) (RegistrationDeliveryResult, error) {
 	f.emailCalls++
-	return nil
+	return RegistrationDeliverySent, nil
 }
 
-func (f *fakeRegistrationNotifier) SendRegistrationWhatsApp(context.Context, RegistrationNotification) error {
+func (f *fakeRegistrationNotifier) SendRegistrationWhatsApp(context.Context, RegistrationNotification) (RegistrationDeliveryResult, error) {
 	f.whatsappCalls++
-	return nil
+	return RegistrationDeliverySent, nil
 }
 
 func TestRegistrationsIntegration(t *testing.T) {
