@@ -425,6 +425,15 @@ func (q *Queries) GetUserWithSubscriptionStatus(ctx context.Context, id uuid.UUI
 	return i, err
 }
 
+const hardDeleteTestUser = `-- name: HardDeleteTestUser :exec
+DELETE FROM users WHERE id = $1
+`
+
+func (q *Queries) HardDeleteTestUser(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, hardDeleteTestUser, id)
+	return err
+}
+
 const updateAccount = `-- name: UpdateAccount :execrows
 UPDATE users
 SET

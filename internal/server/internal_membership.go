@@ -15,14 +15,7 @@ import (
 
 func (s *Server) handlerInternalMembershipLookup(c *gin.Context) {
 	setPrivateNoStore(c)
-	expected := os.Getenv("AUTH_PROFILE_SERVICE_TOKEN")
-	provided := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if expected == "" {
-		respondWithError(c, http.StatusServiceUnavailable, "membership lookup is unavailable", nil)
-		return
-	}
-	if len(provided) != len(expected) || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
-		respondWithError(c, http.StatusUnauthorized, "authorization required", nil)
+	if !internalServiceAuthorized(c) {
 		return
 	}
 
@@ -54,4 +47,39 @@ func (s *Server) handlerInternalMembershipLookup(c *gin.Context) {
 		"practice_id": user.PracticeID,
 		"role":        user.Role,
 	}})
+}
+
+func internalServiceAuthorized(c *gin.Context) bool {
+	expected := os.Getenv("AUTH_PROFILE_SERVICE_TOKEN")
+	provided := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+	if expected == "" {
+		respondWithError(c, http.StatusServiceUnavailable, "membership lookup is unavailable", nil)
+		return false
+	}
+	if len(provided) != len(expected) || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
+		respondWithError(c, http.StatusUnauthorized, "authorization required", nil)
+		return false
+	}
+	return true
+}
+
+func (s *Server) handlerDeleteTestMembership(c *gin.Context) {
+	setPrivateNoStore(c)
+	if os.Getenv("E2E_TEST_MODE") != "true" {
+		respondWithError(c, http.StatusNotFound, "not found", nil)
+		return
+	}
+	if !internalServiceAuthorized(c) {
+		return
+	}
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondWithError(c, http.StatusBadRequest, "invalid user ID", nil)
+		return
+	}
+	if err := s.DBQuery.HardDeleteTestUser(c, userID); err != nil {
+		respondWithError(c, http.StatusInternalServerError, "could not remove test membership", err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

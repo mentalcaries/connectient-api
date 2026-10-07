@@ -132,3 +132,6 @@ UPDATE users
 SET deleted_at = NOW()
 WHERE id = sqlc.arg(id)
 RETURNING *;
+
+-- name: HardDeleteTestUser :exec
+DELETE FROM users WHERE id = sqlc.arg(id);

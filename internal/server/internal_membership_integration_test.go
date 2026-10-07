@@ -49,4 +49,18 @@ func TestInternalMembershipLookup(t *testing.T) {
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("inactive lookup = %d %s", response.Code, response.Body.String())
 	}
+
+	t.Setenv("E2E_TEST_MODE", "true")
+	router.DELETE("/internal/test/memberships/:id", s.handlerDeleteTestMembership)
+	request = httptest.NewRequest(http.MethodDelete, "/internal/test/memberships/"+userID.String(), nil)
+	request.Header.Set("Authorization", "Bearer fixture-service-token")
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("delete fixture = %d %s", response.Code, response.Body.String())
+	}
+	var count int
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE id = $1`, userID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("membership remains count=%d err=%v", count, err)
+	}
 }
