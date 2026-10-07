@@ -7,14 +7,109 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const consumeGoogleOAuthState = `-- name: ConsumeGoogleOAuthState :one
+DELETE FROM google_oauth_states
+WHERE state = $1 AND expires_at > NOW()
+RETURNING practice_id, user_id
+`
+
+type ConsumeGoogleOAuthStateRow struct {
+	PracticeID uuid.UUID
+	UserID     uuid.UUID
+}
+
+func (q *Queries) ConsumeGoogleOAuthState(ctx context.Context, state string) (ConsumeGoogleOAuthStateRow, error) {
+	row := q.db.QueryRow(ctx, consumeGoogleOAuthState, state)
+	var i ConsumeGoogleOAuthStateRow
+	err := row.Scan(&i.PracticeID, &i.UserID)
+	return i, err
+}
+
+const createGoogleOAuthState = `-- name: CreateGoogleOAuthState :exec
+WITH expired AS (
+    DELETE FROM google_oauth_states WHERE expires_at <= NOW()
+)
+INSERT INTO google_oauth_states (state, practice_id, user_id, expires_at)
+VALUES ($1, $2, $3, $4)
+`
+
+type CreateGoogleOAuthStateParams struct {
+	State      string
+	PracticeID uuid.UUID
+	UserID     uuid.UUID
+	ExpiresAt  pgtype.Timestamptz
+}
+
+func (q *Queries) CreateGoogleOAuthState(ctx context.Context, arg CreateGoogleOAuthStateParams) error {
+	_, err := q.db.Exec(ctx, createGoogleOAuthState,
+		arg.State,
+		arg.PracticeID,
+		arg.UserID,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
+const deleteAppointmentCalendarMapping = `-- name: DeleteAppointmentCalendarMapping :exec
+DELETE FROM appointment_calendar_events
+WHERE appointment_id = $1
+  AND provider = 'google_calendar'
+`
+
+func (q *Queries) DeleteAppointmentCalendarMapping(ctx context.Context, appointmentID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAppointmentCalendarMapping, appointmentID)
+	return err
+}
+
+const deleteGoogleCalendarMappingsForPractice = `-- name: DeleteGoogleCalendarMappingsForPractice :exec
+DELETE FROM appointment_calendar_events e
+USING appointments a
+WHERE e.appointment_id = a.id
+  AND e.provider = 'google_calendar'
+  AND a.practice_id = $1
+`
+
+func (q *Queries) DeleteGoogleCalendarMappingsForPractice(ctx context.Context, practiceID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteGoogleCalendarMappingsForPractice, practiceID)
+	return err
+}
+
+const deleteGoogleConnection = `-- name: DeleteGoogleConnection :exec
+DELETE FROM connected_apps
+WHERE practice_id = $1
+  AND provider = 'google_calendar'
+`
+
+func (q *Queries) DeleteGoogleConnection(ctx context.Context, practiceID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteGoogleConnection, practiceID)
+	return err
+}
+
+const getAppointmentCalendarMapping = `-- name: GetAppointmentCalendarMapping :one
+SELECT external_event_id
+FROM appointment_calendar_events
+WHERE appointment_id = $1
+  AND provider = 'google_calendar'
+`
+
+func (q *Queries) GetAppointmentCalendarMapping(ctx context.Context, appointmentID uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getAppointmentCalendarMapping, appointmentID)
+	var external_event_id string
+	err := row.Scan(&external_event_id)
+	return external_event_id, err
+}
 
 const getConnectedApps = `-- name: GetConnectedApps :many
 SELECT provider, connected_account_email, is_connected
 FROM connected_apps
 WHERE practice_id = $1
+ORDER BY provider
 `
 
 type GetConnectedAppsRow struct {
@@ -41,4 +136,243 @@ func (q *Queries) GetConnectedApps(ctx context.Context, practiceID uuid.UUID) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const getGoogleConnection = `-- name: GetGoogleConnection :one
+SELECT id, created_at, updated_at, practice_id, provider, connected_account_email, access_token, refresh_token, token_expires_at, is_connected, last_error, app_calendar_id FROM connected_apps
+WHERE practice_id = $1
+  AND provider = 'google_calendar'
+  AND is_connected = TRUE
+`
+
+func (q *Queries) GetGoogleConnection(ctx context.Context, practiceID uuid.UUID) (ConnectedApp, error) {
+	row := q.db.QueryRow(ctx, getGoogleConnection, practiceID)
+	var i ConnectedApp
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PracticeID,
+		&i.Provider,
+		&i.ConnectedAccountEmail,
+		&i.AccessToken,
+		&i.RefreshToken,
+		&i.TokenExpiresAt,
+		&i.IsConnected,
+		&i.LastError,
+		&i.AppCalendarID,
+	)
+	return i, err
+}
+
+const getGoogleConnectionAny = `-- name: GetGoogleConnectionAny :one
+SELECT id, created_at, updated_at, practice_id, provider, connected_account_email, access_token, refresh_token, token_expires_at, is_connected, last_error, app_calendar_id FROM connected_apps
+WHERE practice_id = $1
+  AND provider = 'google_calendar'
+`
+
+func (q *Queries) GetGoogleConnectionAny(ctx context.Context, practiceID uuid.UUID) (ConnectedApp, error) {
+	row := q.db.QueryRow(ctx, getGoogleConnectionAny, practiceID)
+	var i ConnectedApp
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PracticeID,
+		&i.Provider,
+		&i.ConnectedAccountEmail,
+		&i.AccessToken,
+		&i.RefreshToken,
+		&i.TokenExpiresAt,
+		&i.IsConnected,
+		&i.LastError,
+		&i.AppCalendarID,
+	)
+	return i, err
+}
+
+const listGoogleCalendarBackfillAppointments = `-- name: ListGoogleCalendarBackfillAppointments :many
+SELECT a.id, a.first_name, a.last_name, a.mobile_phone, a.appointment_type,
+       a.scheduled_date, a.scheduled_time, a.duration_minutes,
+       a.scheduled_timezone
+FROM appointments a
+LEFT JOIN appointment_calendar_events e
+  ON e.appointment_id = a.id AND e.provider = 'google_calendar'
+WHERE a.practice_id = $1
+  AND a.is_scheduled = TRUE
+  AND a.is_confirmed = TRUE
+  AND a.is_cancelled = FALSE
+  AND a.deleted_at IS NULL
+  AND a.scheduled_date >= CURRENT_DATE
+  AND e.id IS NULL
+ORDER BY a.scheduled_date, a.scheduled_time, a.id
+`
+
+type ListGoogleCalendarBackfillAppointmentsRow struct {
+	ID                uuid.UUID
+	FirstName         string
+	LastName          string
+	MobilePhone       string
+	AppointmentType   *string
+	ScheduledDate     *time.Time
+	ScheduledTime     *string
+	DurationMinutes   *int32
+	ScheduledTimezone string
+}
+
+func (q *Queries) ListGoogleCalendarBackfillAppointments(ctx context.Context, practiceID uuid.UUID) ([]ListGoogleCalendarBackfillAppointmentsRow, error) {
+	rows, err := q.db.Query(ctx, listGoogleCalendarBackfillAppointments, practiceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGoogleCalendarBackfillAppointmentsRow
+	for rows.Next() {
+		var i ListGoogleCalendarBackfillAppointmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.MobilePhone,
+			&i.AppointmentType,
+			&i.ScheduledDate,
+			&i.ScheduledTime,
+			&i.DurationMinutes,
+			&i.ScheduledTimezone,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markGoogleConnectionFailed = `-- name: MarkGoogleConnectionFailed :exec
+UPDATE connected_apps
+SET is_connected = FALSE, last_error = $1, updated_at = NOW()
+WHERE id = $2
+`
+
+type MarkGoogleConnectionFailedParams struct {
+	LastError *string
+	ID        uuid.UUID
+}
+
+func (q *Queries) MarkGoogleConnectionFailed(ctx context.Context, arg MarkGoogleConnectionFailedParams) error {
+	_, err := q.db.Exec(ctx, markGoogleConnectionFailed, arg.LastError, arg.ID)
+	return err
+}
+
+const setGoogleAppCalendar = `-- name: SetGoogleAppCalendar :exec
+UPDATE connected_apps
+SET app_calendar_id = $1, updated_at = NOW()
+WHERE id = $2
+`
+
+type SetGoogleAppCalendarParams struct {
+	AppCalendarID *string
+	ID            uuid.UUID
+}
+
+func (q *Queries) SetGoogleAppCalendar(ctx context.Context, arg SetGoogleAppCalendarParams) error {
+	_, err := q.db.Exec(ctx, setGoogleAppCalendar, arg.AppCalendarID, arg.ID)
+	return err
+}
+
+const updateGoogleConnectionTokens = `-- name: UpdateGoogleConnectionTokens :exec
+UPDATE connected_apps
+SET access_token = $1,
+    token_expires_at = $2,
+    is_connected = TRUE, last_error = NULL, updated_at = NOW()
+WHERE id = $3
+`
+
+type UpdateGoogleConnectionTokensParams struct {
+	AccessToken    *string
+	TokenExpiresAt *time.Time
+	ID             uuid.UUID
+}
+
+func (q *Queries) UpdateGoogleConnectionTokens(ctx context.Context, arg UpdateGoogleConnectionTokensParams) error {
+	_, err := q.db.Exec(ctx, updateGoogleConnectionTokens, arg.AccessToken, arg.TokenExpiresAt, arg.ID)
+	return err
+}
+
+const upsertAppointmentCalendarMapping = `-- name: UpsertAppointmentCalendarMapping :exec
+INSERT INTO appointment_calendar_events (appointment_id, provider, external_event_id)
+VALUES ($1, 'google_calendar', $2)
+ON CONFLICT (appointment_id, provider) DO UPDATE SET
+    external_event_id = EXCLUDED.external_event_id,
+    updated_at = NOW()
+`
+
+type UpsertAppointmentCalendarMappingParams struct {
+	AppointmentID   uuid.UUID
+	ExternalEventID string
+}
+
+func (q *Queries) UpsertAppointmentCalendarMapping(ctx context.Context, arg UpsertAppointmentCalendarMappingParams) error {
+	_, err := q.db.Exec(ctx, upsertAppointmentCalendarMapping, arg.AppointmentID, arg.ExternalEventID)
+	return err
+}
+
+const upsertGoogleConnection = `-- name: UpsertGoogleConnection :one
+INSERT INTO connected_apps (
+    practice_id, provider, connected_account_email, access_token,
+    refresh_token, token_expires_at, is_connected, last_error, updated_at
+) VALUES (
+    $1, 'google_calendar', $2,
+    $3, $4, $5,
+    TRUE, NULL, NOW()
+)
+ON CONFLICT (practice_id, provider) DO UPDATE SET
+    connected_account_email = EXCLUDED.connected_account_email,
+    access_token = EXCLUDED.access_token,
+    refresh_token = COALESCE(EXCLUDED.refresh_token, connected_apps.refresh_token),
+    token_expires_at = EXCLUDED.token_expires_at,
+    is_connected = TRUE,
+    last_error = NULL,
+    app_calendar_id = CASE
+        WHEN connected_apps.connected_account_email IS DISTINCT FROM EXCLUDED.connected_account_email THEN NULL
+        ELSE connected_apps.app_calendar_id
+    END,
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, practice_id, provider, connected_account_email, access_token, refresh_token, token_expires_at, is_connected, last_error, app_calendar_id
+`
+
+type UpsertGoogleConnectionParams struct {
+	PracticeID            uuid.UUID
+	ConnectedAccountEmail *string
+	AccessToken           *string
+	RefreshToken          *string
+	TokenExpiresAt        *time.Time
+}
+
+func (q *Queries) UpsertGoogleConnection(ctx context.Context, arg UpsertGoogleConnectionParams) (ConnectedApp, error) {
+	row := q.db.QueryRow(ctx, upsertGoogleConnection,
+		arg.PracticeID,
+		arg.ConnectedAccountEmail,
+		arg.AccessToken,
+		arg.RefreshToken,
+		arg.TokenExpiresAt,
+	)
+	var i ConnectedApp
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PracticeID,
+		&i.Provider,
+		&i.ConnectedAccountEmail,
+		&i.AccessToken,
+		&i.RefreshToken,
+		&i.TokenExpiresAt,
+		&i.IsConnected,
+		&i.LastError,
+		&i.AppCalendarID,
+	)
+	return i, err
 }

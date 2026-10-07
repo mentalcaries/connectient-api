@@ -20,7 +20,7 @@ WHERE id = $1
   AND practice_id = $2
   AND is_cancelled IS FALSE
   AND deleted_at IS NULL
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone
 `
 
 type CancelAppointmentParams struct {
@@ -58,6 +58,7 @@ func (q *Queries) CancelAppointment(ctx context.Context, arg CancelAppointmentPa
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }
@@ -74,7 +75,7 @@ WHERE id = $5
   AND is_confirmed IS FALSE
   AND is_cancelled IS FALSE
   AND deleted_at IS NULL
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone
 `
 
 type ConfirmAppointmentParams struct {
@@ -123,6 +124,7 @@ func (q *Queries) ConfirmAppointment(ctx context.Context, arg ConfirmAppointment
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }
@@ -132,33 +134,34 @@ INSERT INTO appointments (
     practice_id, patient_id, first_name, last_name, email, mobile_phone,
     appointment_type, provider_id, location_id, duration_minutes,
     scheduled_date, scheduled_time, is_scheduled, is_cancelled,
-    is_confirmed, is_emergency, created_by, scheduled_by
+    is_confirmed, is_emergency, created_by, scheduled_by, scheduled_timezone
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6, $7, $8,
     $9, $10, $11::date,
     $12::time, TRUE, FALSE, $13, FALSE,
-    $14, $15
+    $14, $15, $16
 )
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone
 `
 
 type CreateStaffAppointmentParams struct {
-	PracticeID      uuid.UUID
-	PatientID       *uuid.UUID
-	FirstName       string
-	LastName        string
-	Email           string
-	MobilePhone     string
-	AppointmentType *string
-	ProviderID      *uuid.UUID
-	LocationID      *uuid.UUID
-	DurationMinutes *int32
-	ScheduledDate   time.Time
-	ScheduledTime   string
-	IsConfirmed     bool
-	CreatedBy       *uuid.UUID
-	ScheduledBy     *uuid.UUID
+	PracticeID        uuid.UUID
+	PatientID         *uuid.UUID
+	FirstName         string
+	LastName          string
+	Email             string
+	MobilePhone       string
+	AppointmentType   *string
+	ProviderID        *uuid.UUID
+	LocationID        *uuid.UUID
+	DurationMinutes   *int32
+	ScheduledDate     time.Time
+	ScheduledTime     string
+	IsConfirmed       bool
+	CreatedBy         *uuid.UUID
+	ScheduledBy       *uuid.UUID
+	ScheduledTimezone string
 }
 
 func (q *Queries) CreateStaffAppointment(ctx context.Context, arg CreateStaffAppointmentParams) (Appointment, error) {
@@ -178,6 +181,7 @@ func (q *Queries) CreateStaffAppointment(ctx context.Context, arg CreateStaffApp
 		arg.IsConfirmed,
 		arg.CreatedBy,
 		arg.ScheduledBy,
+		arg.ScheduledTimezone,
 	)
 	var i Appointment
 	err := row.Scan(
@@ -207,6 +211,7 @@ func (q *Queries) CreateStaffAppointment(ctx context.Context, arg CreateStaffApp
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }
@@ -322,7 +327,7 @@ func (q *Queries) FindPatientByContact(ctx context.Context, arg FindPatientByCon
 }
 
 const getAppointmentById = `-- name: GetAppointmentById :one
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed FROM appointments
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone FROM appointments
 WHERE id = $1 AND practice_id = $2
 `
 
@@ -361,12 +366,13 @@ func (q *Queries) GetAppointmentById(ctx context.Context, arg GetAppointmentById
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }
 
 const getAppointments = `-- name: GetAppointments :many
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed FROM appointments
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone FROM appointments
 WHERE practice_id = $1
 ORDER BY created_at DESC, id DESC
 `
@@ -407,6 +413,7 @@ func (q *Queries) GetAppointments(ctx context.Context, practiceID uuid.UUID) ([]
 			&i.Token,
 			&i.DeletedAt,
 			&i.IsConfirmed,
+			&i.ScheduledTimezone,
 		); err != nil {
 			return nil, err
 		}
@@ -419,7 +426,7 @@ func (q *Queries) GetAppointments(ctx context.Context, practiceID uuid.UUID) ([]
 }
 
 const getConfirmedAppointments = `-- name: GetConfirmedAppointments :many
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed FROM appointments
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone FROM appointments
 WHERE practice_id = $1
   AND is_scheduled IS TRUE
   AND is_cancelled IS FALSE
@@ -470,6 +477,7 @@ func (q *Queries) GetConfirmedAppointments(ctx context.Context, arg GetConfirmed
 			&i.Token,
 			&i.DeletedAt,
 			&i.IsConfirmed,
+			&i.ScheduledTimezone,
 		); err != nil {
 			return nil, err
 		}
@@ -701,7 +709,7 @@ func (q *Queries) ListSchedulingConflicts(ctx context.Context, arg ListSchedulin
 }
 
 const lockAppointmentForCancellation = `-- name: LockAppointmentForCancellation :one
-SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed FROM appointments
+SELECT id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone FROM appointments
 WHERE id = $1
   AND practice_id = $2
   AND deleted_at IS NULL
@@ -743,6 +751,7 @@ func (q *Queries) LockAppointmentForCancellation(ctx context.Context, arg LockAp
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }
@@ -869,9 +878,10 @@ SET is_scheduled = TRUE,
     appointment_type = CASE WHEN $7::boolean THEN $8::text ELSE appointment_type END,
     duration_minutes = $9,
     scheduled_by = $10,
+    scheduled_timezone = $11,
     modified_at = NOW()
-WHERE id = $11 AND practice_id = $12
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+WHERE id = $12 AND practice_id = $13
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone
 `
 
 type ScheduleAppointmentParams struct {
@@ -885,6 +895,7 @@ type ScheduleAppointmentParams struct {
 	AppointmentType    *string
 	DurationMinutes    *int32
 	ScheduledBy        *uuid.UUID
+	ScheduledTimezone  string
 	ID                 uuid.UUID
 	PracticeID         uuid.UUID
 }
@@ -901,6 +912,7 @@ func (q *Queries) ScheduleAppointment(ctx context.Context, arg ScheduleAppointme
 		arg.AppointmentType,
 		arg.DurationMinutes,
 		arg.ScheduledBy,
+		arg.ScheduledTimezone,
 		arg.ID,
 		arg.PracticeID,
 	)
@@ -932,6 +944,7 @@ func (q *Queries) ScheduleAppointment(ctx context.Context, arg ScheduleAppointme
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }
@@ -944,7 +957,7 @@ WHERE id = $1
   AND is_scheduled IS FALSE
   AND is_cancelled IS FALSE
   AND deleted_at IS NULL
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone
 `
 
 type SoftDeleteAppointmentParams struct {
@@ -982,6 +995,7 @@ func (q *Queries) SoftDeleteAppointment(ctx context.Context, arg SoftDeleteAppoi
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }

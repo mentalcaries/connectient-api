@@ -67,7 +67,7 @@ INSERT INTO appointments (
     $9, $10, $11,
     $12, $13, FALSE, FALSE, FALSE
 )
-RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed
+RETURNING id, created_at, modified_at, first_name, last_name, email, mobile_phone, requested_date, requested_time, is_emergency, description, appointment_type, is_scheduled, scheduled_date, scheduled_time, is_cancelled, duration_minutes, created_by, scheduled_by, practice_id, provider_id, location_id, patient_id, token, deleted_at, is_confirmed, scheduled_timezone
 `
 
 type CreatePublicAppointmentRequestParams struct {
@@ -130,6 +130,7 @@ func (q *Queries) CreatePublicAppointmentRequest(ctx context.Context, arg Create
 		&i.Token,
 		&i.DeletedAt,
 		&i.IsConfirmed,
+		&i.ScheduledTimezone,
 	)
 	return i, err
 }

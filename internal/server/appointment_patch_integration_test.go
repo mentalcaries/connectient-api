@@ -45,6 +45,9 @@ func TestAppointmentPatchIntegration(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if _, err := pool.Exec(ctx, `ALTER TABLE appointments ADD COLUMN scheduled_timezone TEXT NOT NULL DEFAULT 'America/Port_of_Spain'`); err != nil {
+				t.Fatal(err)
+			}
 			practiceID, otherPracticeID, appointmentID := uuid.New(), uuid.New(), uuid.New()
 			for _, id := range []uuid.UUID{practiceID, otherPracticeID} {
 				if _, err := pool.Exec(ctx, `INSERT INTO practices (id, name, city, practice_code, practice_category)

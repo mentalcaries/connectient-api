@@ -88,6 +88,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		public.GET("/registrations/form/:token", s.handlerGetPublicRegistrationForm)
 		public.POST("/registrations/form/:token", s.handlerSubmitPublicRegistrationForm)
 		public.GET("/invite/validate", s.handlerValidateInvite)
+		public.GET("/connected-apps/google/callback", s.handlerGoogleCalendarCallback)
 
 	}
 
@@ -164,7 +165,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 		authenticated.DELETE("/upload/avatar", s.handlerDeleteAvatar)
 		authenticated.POST("/upload/logo", requireAdmin(), s.handlerUploadPracticeLogo)
 		authenticated.DELETE("/upload/logo", requireAdmin(), s.handlerDeletePracticeLogo)
-		authenticated.GET("/practices/connected-apps", requireOwner(), s.handlerGetConnectedApps)
+		authenticated.GET("/connected-apps", requireOwner(), s.handlerGetConnectedApps)
+		authenticated.GET("/connected-apps/google/auth", requireOwner(), s.handlerGoogleCalendarAuth)
+		authenticated.DELETE("/connected-apps/google", requireOwner(), s.handlerDeleteGoogleCalendar)
 	}
 
 	return router

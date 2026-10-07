@@ -263,6 +263,9 @@ func decodeScheduleAppointment(body io.Reader) (scheduleAppointmentInput, error)
 	if timezone == "" || len(timezone) > 100 {
 		return scheduleAppointmentInput{}, errors.New("invalid timezone")
 	}
+	if _, err := time.LoadLocation(timezone); err != nil {
+		return scheduleAppointmentInput{}, errors.New("invalid timezone")
+	}
 	input := scheduleAppointmentInput{
 		ScheduledDate: wire.ScheduledDate, ScheduledTime: wire.ScheduledTime,
 		Location: wire.Location, AppointmentType: wire.AppointmentType,

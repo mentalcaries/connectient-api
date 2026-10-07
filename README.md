@@ -52,6 +52,11 @@ E2E_TEST_MODE=         # true simulates outbound delivery without network access
 OUTBOUND_MESSAGES_DISABLED= # true disables email and WhatsApp
 SKIP_EMAIL=            # true disables email only
 SKIP_WHATSAPP=         # true disables WhatsApp only
+GOOGLE_CLIENT_ID=      # OAuth client for Google Calendar connection
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=   # Registered callback URL ending in /connected-apps/google/callback
+ENCRYPTION_KEY=        # Base64-encoded 32-byte AES key for OAuth tokens
+SKIP_CALENDAR=         # true disables every Google Calendar network operation
 ```
 
 ---

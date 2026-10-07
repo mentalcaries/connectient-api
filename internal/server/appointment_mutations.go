@@ -275,6 +275,7 @@ func (s *Server) createStaffAppointmentTransaction(ctx context.Context, user Aut
 		AppointmentType: &appointmentType, ProviderID: &providerID, LocationID: input.LocationID,
 		DurationMinutes: &duration, ScheduledDate: date, ScheduledTime: input.ScheduledTime,
 		IsConfirmed: input.IsConfirmed, CreatedBy: &user.ID, ScheduledBy: &user.ID,
+		ScheduledTimezone: input.Timezone,
 	})
 	if err != nil {
 		return staffAppointmentTransactionResult{}, err
@@ -334,6 +335,7 @@ func (s *Server) scheduleAppointmentTransaction(ctx context.Context, user AuthUs
 		ProviderID: &providerID, SetLocation: input.Location.Set, LocationID: input.Location.Value,
 		SetAppointmentType: input.AppointmentType.Set, AppointmentType: input.AppointmentType.Value,
 		DurationMinutes: &duration, ScheduledBy: &user.ID, ID: id, PracticeID: *user.PracticeId,
+		ScheduledTimezone: input.Timezone,
 	})
 	if err != nil {
 		return scheduleTransactionResult{}, err

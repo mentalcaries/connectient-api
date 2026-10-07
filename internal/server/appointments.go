@@ -15,31 +15,32 @@ import (
 )
 
 type appointmentDTO struct {
-	ID              uuid.UUID  `json:"id"`
-	CreatedAt       time.Time  `json:"created_at"`
-	ModifiedAt      time.Time  `json:"modified_at"`
-	FirstName       string     `json:"first_name"`
-	LastName        string     `json:"last_name"`
-	Email           string     `json:"email"`
-	MobilePhone     string     `json:"mobile_phone"`
-	RequestedDate   *string    `json:"requested_date"`
-	RequestedTime   string     `json:"requested_time"`
-	IsEmergency     bool       `json:"is_emergency"`
-	Description     *string    `json:"description"`
-	AppointmentType *string    `json:"appointment_type"`
-	IsScheduled     bool       `json:"is_scheduled"`
-	ScheduledDate   *string    `json:"scheduled_date"`
-	ScheduledTime   *string    `json:"scheduled_time"`
-	IsCancelled     bool       `json:"is_cancelled"`
-	IsConfirmed     bool       `json:"is_confirmed"`
-	DurationMinutes *int32     `json:"duration_minutes"`
-	CreatedBy       *uuid.UUID `json:"created_by"`
-	ScheduledBy     *uuid.UUID `json:"scheduled_by"`
-	PracticeID      uuid.UUID  `json:"practice_id"`
-	ProviderID      *uuid.UUID `json:"provider_id"`
-	LocationID      *uuid.UUID `json:"location_id"`
-	PatientID       *uuid.UUID `json:"patient_id"`
-	DeletedAt       *time.Time `json:"deleted_at"`
+	ID                uuid.UUID  `json:"id"`
+	CreatedAt         time.Time  `json:"created_at"`
+	ModifiedAt        time.Time  `json:"modified_at"`
+	FirstName         string     `json:"first_name"`
+	LastName          string     `json:"last_name"`
+	Email             string     `json:"email"`
+	MobilePhone       string     `json:"mobile_phone"`
+	RequestedDate     *string    `json:"requested_date"`
+	RequestedTime     string     `json:"requested_time"`
+	IsEmergency       bool       `json:"is_emergency"`
+	Description       *string    `json:"description"`
+	AppointmentType   *string    `json:"appointment_type"`
+	IsScheduled       bool       `json:"is_scheduled"`
+	ScheduledDate     *string    `json:"scheduled_date"`
+	ScheduledTime     *string    `json:"scheduled_time"`
+	IsCancelled       bool       `json:"is_cancelled"`
+	IsConfirmed       bool       `json:"is_confirmed"`
+	DurationMinutes   *int32     `json:"duration_minutes"`
+	CreatedBy         *uuid.UUID `json:"created_by"`
+	ScheduledBy       *uuid.UUID `json:"scheduled_by"`
+	PracticeID        uuid.UUID  `json:"practice_id"`
+	ProviderID        *uuid.UUID `json:"provider_id"`
+	LocationID        *uuid.UUID `json:"location_id"`
+	PatientID         *uuid.UUID `json:"patient_id"`
+	DeletedAt         *time.Time `json:"deleted_at"`
+	ScheduledTimezone string     `json:"scheduled_timezone"`
 }
 
 type patchAppointmentContactsInput struct {
@@ -204,6 +205,7 @@ func appointmentResponse(appointment db.Appointment) appointmentDTO {
 		CreatedBy: appointment.CreatedBy, ScheduledBy: appointment.ScheduledBy,
 		PracticeID: appointment.PracticeID, ProviderID: appointment.ProviderID,
 		LocationID: appointment.LocationID, PatientID: appointment.PatientID, DeletedAt: appointment.DeletedAt,
+		ScheduledTimezone: appointment.ScheduledTimezone,
 	}
 }
 

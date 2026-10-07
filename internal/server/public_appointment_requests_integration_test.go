@@ -196,6 +196,9 @@ func newPublicAppointmentRequestTestPool(t *testing.T, ctx context.Context) *pgx
 			t.Fatalf("%s: %v", file, err)
 		}
 	}
+	if _, err := pool.Exec(ctx, `ALTER TABLE appointments ADD COLUMN scheduled_timezone TEXT NOT NULL DEFAULT 'America/Port_of_Spain'`); err != nil {
+		t.Fatal(err)
+	}
 	return pool
 }
 

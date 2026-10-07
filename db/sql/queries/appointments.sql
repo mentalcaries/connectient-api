@@ -131,6 +131,7 @@ SET is_scheduled = TRUE,
     appointment_type = CASE WHEN sqlc.arg(set_appointment_type)::boolean THEN sqlc.narg(appointment_type)::text ELSE appointment_type END,
     duration_minutes = sqlc.arg(duration_minutes),
     scheduled_by = sqlc.arg(scheduled_by),
+    scheduled_timezone = sqlc.arg(scheduled_timezone),
     modified_at = NOW()
 WHERE id = sqlc.arg(id) AND practice_id = sqlc.arg(practice_id)
 RETURNING *;
@@ -178,13 +179,13 @@ INSERT INTO appointments (
     practice_id, patient_id, first_name, last_name, email, mobile_phone,
     appointment_type, provider_id, location_id, duration_minutes,
     scheduled_date, scheduled_time, is_scheduled, is_cancelled,
-    is_confirmed, is_emergency, created_by, scheduled_by
+    is_confirmed, is_emergency, created_by, scheduled_by, scheduled_timezone
 ) VALUES (
     sqlc.arg(practice_id), sqlc.arg(patient_id), sqlc.arg(first_name), sqlc.arg(last_name),
     sqlc.arg(email), sqlc.arg(mobile_phone), sqlc.arg(appointment_type), sqlc.arg(provider_id),
     sqlc.narg(location_id), sqlc.arg(duration_minutes), sqlc.arg(scheduled_date)::date,
     sqlc.arg(scheduled_time)::time, TRUE, FALSE, sqlc.arg(is_confirmed), FALSE,
-    sqlc.arg(created_by), sqlc.arg(scheduled_by)
+    sqlc.arg(created_by), sqlc.arg(scheduled_by), sqlc.arg(scheduled_timezone)
 )
 RETURNING *;
 
