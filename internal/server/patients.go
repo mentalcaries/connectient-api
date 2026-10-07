@@ -57,11 +57,11 @@ type PatientAppointmentResponse struct {
 	LastName        string     `json:"last_name"`
 	Email           string     `json:"email"`
 	MobilePhone     string     `json:"mobile_phone"`
-	RequestedDate   string     `json:"requested_date"`
+	RequestedDate   *string    `json:"requested_date"`
 	RequestedTime   string     `json:"requested_time"`
 	IsEmergency     bool       `json:"is_emergency"`
 	Description     *string    `json:"description"`
-	AppointmentType string     `json:"appointment_type"`
+	AppointmentType *string    `json:"appointment_type"`
 	IsScheduled     bool       `json:"is_scheduled"`
 	ScheduledDate   *string    `json:"scheduled_date"`
 	ScheduledTime   *string    `json:"scheduled_time"`
@@ -216,7 +216,7 @@ func (s *Server) handlerGetPatientAppointments(c *gin.Context) {
 		appointments = append(appointments, PatientAppointmentResponse{
 			ID: row.ID, CreatedAt: row.CreatedAt, ModifiedAt: row.ModifiedAt,
 			FirstName: row.FirstName, LastName: row.LastName, Email: row.Email,
-			MobilePhone: row.MobilePhone, RequestedDate: row.RequestedDate.Format("2006-01-02"),
+			MobilePhone: row.MobilePhone, RequestedDate: formatPatientDate(row.RequestedDate),
 			RequestedTime: row.RequestedTime, IsEmergency: row.IsEmergency,
 			Description: row.Description, AppointmentType: row.AppointmentType,
 			IsScheduled: row.IsScheduled, ScheduledDate: formatPatientDate(row.ScheduledDate),

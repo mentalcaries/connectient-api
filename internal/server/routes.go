@@ -81,7 +81,6 @@ func (s *Server) RegisterRoutes() http.Handler {
 	{
 		public.GET("/", s.handleReadiness)
 		public.GET("/health", s.healthHandler)
-		public.POST("/appointments", s.handlerAppointmentsCreate)
 		public.GET("/public/practices/:code/booking-config", s.handlerGetPublicBookingConfig)
 		public.GET("/public/practices/:code/procedure-types", s.handlerGetPublicProcedureTypes)
 		public.GET("/public/practices/:code/locations", s.handlerGetPublicLocations)
@@ -109,10 +108,14 @@ func (s *Server) RegisterRoutes() http.Handler {
 	authenticated.Use(s.AuthMiddleware())
 	{
 		authenticated.GET("/appointments", s.handlerGetAllAppointments)
-		authenticated.GET("appointments/:id", s.handlerGetAppointmentById)
+		authenticated.POST("/appointments", s.handlerCreateStaffAppointment)
+		authenticated.GET("/appointments/availability", s.handlerGetAppointmentAvailability)
+		authenticated.GET("/appointments/:id", s.handlerGetAppointmentById)
 		authenticated.PATCH("/appointments/:id", s.handlerAppointmentsUpdate)
 		authenticated.DELETE("/appointments/:id", s.handlerAppointmentsDelete)
 		authenticated.GET("/appointments/confirmed", s.handlerGetConfirmedAppointments)
+		authenticated.POST("/appointments/:id/schedule", s.handlerScheduleAppointment)
+		authenticated.POST("/appointments/:id/confirm", s.handlerConfirmAppointment)
 		authenticated.GET("/patients", s.handlerListPatients)
 		authenticated.GET("/patients/:id", s.handlerGetPatient)
 		authenticated.PATCH("/patients/:id", s.handlerPatchPatient)

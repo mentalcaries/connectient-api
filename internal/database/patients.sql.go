@@ -152,11 +152,11 @@ type GetPatientAppointmentsRow struct {
 	LastName        string
 	Email           string
 	MobilePhone     string
-	RequestedDate   time.Time
+	RequestedDate   *time.Time
 	RequestedTime   string
 	IsEmergency     bool
 	Description     *string
-	AppointmentType string
+	AppointmentType *string
 	IsScheduled     bool
 	ScheduledDate   *time.Time
 	ScheduledTime   *string

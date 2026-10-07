@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,135 +15,87 @@ import (
 	db "github.com/mentalcaries/connectient-api/internal/database"
 )
 
-type Appointment struct {
+type appointmentDTO struct {
 	ID              uuid.UUID  `json:"id"`
 	CreatedAt       time.Time  `json:"created_at"`
 	ModifiedAt      time.Time  `json:"modified_at"`
-	Email           string     `json:"email"`
 	FirstName       string     `json:"first_name"`
 	LastName        string     `json:"last_name"`
+	Email           string     `json:"email"`
 	MobilePhone     string     `json:"mobile_phone"`
-	RequestedDate   time.Time  `json:"requested_date"`
-	IsEmergency     bool       `json:"is_emergency"`
-	Description     *string    `json:"description,omitempty"`
-	AppointmentType *string    `json:"appointment_type"`
-	IsScheduled     *bool      `json:"is_scheduled"`
-	ScheduledDate   *time.Time `json:"scheduled_date,omitempty"`
-	ScheduledTime   *string    `json:"scheduled_time,omitempty"`
-	CreatedBy       *uuid.UUID `json:"created_by,omitempty"`
-	ScheduledBy     *uuid.UUID `json:"scheduled_by,omitempty"`
-	IsCancelled     *bool      `json:"is_cancelled"`
+	RequestedDate   *string    `json:"requested_date"`
 	RequestedTime   string     `json:"requested_time"`
+	IsEmergency     bool       `json:"is_emergency"`
+	Description     *string    `json:"description"`
+	AppointmentType *string    `json:"appointment_type"`
+	IsScheduled     bool       `json:"is_scheduled"`
+	ScheduledDate   *string    `json:"scheduled_date"`
+	ScheduledTime   *string    `json:"scheduled_time"`
+	IsCancelled     bool       `json:"is_cancelled"`
+	IsConfirmed     bool       `json:"is_confirmed"`
+	DurationMinutes *int32     `json:"duration_minutes"`
+	CreatedBy       *uuid.UUID `json:"created_by"`
+	ScheduledBy     *uuid.UUID `json:"scheduled_by"`
 	PracticeID      uuid.UUID  `json:"practice_id"`
-	Token           string     `json:"token"`
+	ProviderID      *uuid.UUID `json:"provider_id"`
+	LocationID      *uuid.UUID `json:"location_id"`
+	PatientID       *uuid.UUID `json:"patient_id"`
+	DeletedAt       *time.Time `json:"deleted_at"`
 }
 
-type NewAppointmentRequest struct {
-	Email           string    `json:"email"`
-	FirstName       string    `json:"first_name"`
-	LastName        string    `json:"last_name"`
-	MobilePhone     string    `json:"mobile_phone"`
-	RequestedDate   string    `json:"requested_date"`
-	IsEmergency     bool      `json:"is_emergency"`
-	Description     string    `json:"description,omitempty"`
-	AppointmentType string    `json:"appointment_type,omitempty"`
-	RequestedTime   string    `json:"requested_time"`
-	PracticeID      uuid.UUID `json:"practice_id"`
-}
-
-type UpdateAppointmentRequest struct {
-	ID            uuid.UUID  `json:"id"`
-	ScheduledDate *time.Time `json:"scheduled_date,omitempty"`
-	ScheduledTime *string    `json:"scheduled_time,omitempty"`
-	IsScheduled   bool       `json:"is_scheduled,omitempty"`
-	IsCancelled   bool       `json:"is_cancelled,omitempty"`
-}
-
-type ConfirmedAppointment struct {
-	ID              uuid.UUID `json:"id"`
-	FirstName       string    `json:"first_name"`
-	LastName        string    `json:"last_name"`
-	AppointmentType string    `json:"appointment_type"`
-	MobilePhone     string    `json:"mobile_phone"`
-	ScheduledDate   time.Time `json:"scheduled_date"`
-	ScheduledTime   *string   `json:"scheduled_time"`
-	DurationMinutes *int      `json:"duration_minutes"`
+type patchAppointmentContactsInput struct {
+	SetEmail       bool
+	Email          string
+	SetMobilePhone bool
+	MobilePhone    string
 }
 
 func (s *Server) handlerGetAllAppointments(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
-	dbAppts, err := s.DBQuery.GetAppointments(c, *user.PracticeId)
-	if err != nil {
-		respondWithError(c, http.StatusInternalServerError, "Could not get Appointments", err)
+	if user.PracticeId == nil {
+		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
 		return
 	}
-	appointments := []Appointment{}
-
-	for _, dbAppt := range dbAppts {
-		appointments = append(appointments, Appointment{
-			ID:              dbAppt.ID,
-			CreatedAt:       dbAppt.CreatedAt,
-			ModifiedAt:      dbAppt.ModifiedAt,
-			Email:           dbAppt.Email,
-			FirstName:       dbAppt.FirstName,
-			LastName:        dbAppt.LastName,
-			MobilePhone:     dbAppt.MobilePhone,
-			RequestedDate:   dbAppt.RequestedDate,
-			IsEmergency:     dbAppt.IsEmergency,
-			Description:     dbAppt.Description,
-			AppointmentType: &dbAppt.AppointmentType,
-			IsScheduled:     &dbAppt.IsScheduled,
-			ScheduledDate:   dbAppt.ScheduledDate,
-			CreatedBy:       dbAppt.CreatedBy,
-			ScheduledBy:     dbAppt.ScheduledBy,
-			IsCancelled:     &dbAppt.IsCancelled,
-			RequestedTime:   dbAppt.RequestedTime,
-			ScheduledTime:   dbAppt.ScheduledTime,
-			PracticeID:      dbAppt.PracticeID,
-			Token:           dbAppt.Token,
-		})
+	appointments, err := s.DBQuery.GetAppointments(c, *user.PracticeId)
+	if err != nil {
+		respondWithError(c, http.StatusInternalServerError, "Could not get appointments", err)
+		return
 	}
-	c.JSON(http.StatusOK, appointments)
+	data := make([]appointmentDTO, 0, len(appointments))
+	for _, appointment := range appointments {
+		data = append(data, appointmentResponse(appointment))
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": data})
 }
 
 func (s *Server) handlerGetConfirmedAppointments(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
-	startDate, err := time.Parse("2006-01-02", c.Query("start"))
-	if err != nil {
-		respondWithError(c, http.StatusBadRequest, "invalid start date", err)
+	if user.PracticeId == nil {
+		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
 		return
 	}
-	endDate, err := time.Parse("2006-01-02", c.Query("end"))
-	if err != nil {
-		respondWithError(c, http.StatusBadRequest, "invalid start date", err)
+	startDate, endDate, ok := parseAppointmentDateRange(c)
+	if !ok {
 		return
 	}
-	dbAppts, err := s.DBQuery.GetConfirmedAppointments(c, db.GetConfirmedAppointmentsParams{
-		PracticeID: *user.PracticeId,
-		StartDate:  &startDate,
-		EndDate:    &endDate,
+	appointments, err := s.DBQuery.GetConfirmedAppointments(c, db.GetConfirmedAppointmentsParams{
+		PracticeID: *user.PracticeId, StartDate: &startDate, EndDate: &endDate,
 	})
 	if err != nil {
-		respondWithError(c, http.StatusInternalServerError, "Could not get Appointments", err)
+		respondWithError(c, http.StatusInternalServerError, "Failed to fetch appointments", err)
 		return
 	}
-	appointments := []ConfirmedAppointment{}
-
-	for _, dbAppt := range dbAppts {
-		appointments = append(appointments, ConfirmedAppointment{
-			ID:              dbAppt.ID,
-			FirstName:       dbAppt.FirstName,
-			LastName:        dbAppt.LastName,
-			MobilePhone:     dbAppt.MobilePhone,
-			AppointmentType: dbAppt.AppointmentType,
-			ScheduledDate:   *dbAppt.ScheduledDate,
-			ScheduledTime:   dbAppt.ScheduledTime,
-		})
+	data := make([]appointmentDTO, 0, len(appointments))
+	for _, appointment := range appointments {
+		data = append(data, appointmentResponse(appointment))
 	}
-	c.JSON(http.StatusOK, appointments)
+	c.JSON(http.StatusOK, data)
 }
 
 func (s *Server) handlerGetAppointmentById(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
 	if user.PracticeId == nil {
 		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
@@ -152,11 +106,7 @@ func (s *Server) handlerGetAppointmentById(c *gin.Context) {
 		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
 		return
 	}
-
-	dbAppt, err := s.DBQuery.GetAppointmentById(c, db.GetAppointmentByIdParams{
-		ID:         id,
-		PracticeID: *user.PracticeId,
-	})
+	appointment, err := s.DBQuery.GetAppointmentById(c, db.GetAppointmentByIdParams{ID: id, PracticeID: *user.PracticeId})
 	if errors.Is(err, pgx.ErrNoRows) {
 		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
 		return
@@ -165,85 +115,11 @@ func (s *Server) handlerGetAppointmentById(c *gin.Context) {
 		respondWithError(c, http.StatusInternalServerError, "Could not get appointment", err)
 		return
 	}
-	c.JSON(http.StatusOK, Appointment{
-		ID:              dbAppt.ID,
-		CreatedAt:       dbAppt.CreatedAt,
-		ModifiedAt:      dbAppt.ModifiedAt,
-		Email:           dbAppt.Email,
-		FirstName:       dbAppt.FirstName,
-		LastName:        dbAppt.LastName,
-		MobilePhone:     dbAppt.MobilePhone,
-		RequestedDate:   dbAppt.RequestedDate,
-		IsEmergency:     dbAppt.IsEmergency,
-		Description:     dbAppt.Description,
-		AppointmentType: &dbAppt.AppointmentType,
-		IsScheduled:     &dbAppt.IsScheduled,
-		ScheduledDate:   dbAppt.ScheduledDate,
-		CreatedBy:       dbAppt.CreatedBy,
-		ScheduledBy:     dbAppt.ScheduledBy,
-		IsCancelled:     &dbAppt.IsCancelled,
-		RequestedTime:   dbAppt.RequestedTime,
-		ScheduledTime:   dbAppt.ScheduledTime,
-		PracticeID:      dbAppt.PracticeID,
-		Token:           dbAppt.Token,
-	})
-}
-
-func (s *Server) handlerAppointmentsCreate(c *gin.Context) {
-	decoder := json.NewDecoder(c.Request.Body)
-	params := NewAppointmentRequest{}
-
-	err := decoder.Decode(&params)
-	if err != nil {
-		respondWithError(c, http.StatusBadRequest, "Invalid request", err)
-		return
-	}
-
-	apptToken := MakeToken()
-
-	requestedDate, err := time.Parse("2006-01-02", params.RequestedDate)
-	if err != nil {
-		respondWithError(c, http.StatusBadRequest, "Invalid date format, expected YYYY-MM-DD", err)
-		return
-	}
-
-	appointment, err := s.DBQuery.CreateAppointment(c, db.CreateAppointmentParams{
-		FirstName:       params.FirstName,
-		LastName:        params.LastName,
-		MobilePhone:     params.MobilePhone,
-		Email:           params.Email,
-		RequestedDate:   &requestedDate,
-		RequestedTime:   params.RequestedTime,
-		AppointmentType: &params.AppointmentType,
-		Description:     &params.Description,
-		IsEmergency:     params.IsEmergency,
-		PracticeID:      &params.PracticeID,
-		Token:           apptToken,
-	})
-
-	if err != nil {
-		respondWithError(c, http.StatusInternalServerError, "Could not save to database", err)
-		return
-	}
-	c.JSON(http.StatusCreated, Appointment{
-		ID:              appointment.ID,
-		CreatedAt:       appointment.CreatedAt,
-		ModifiedAt:      appointment.ModifiedAt,
-		FirstName:       appointment.FirstName,
-		LastName:        appointment.LastName,
-		MobilePhone:     appointment.MobilePhone,
-		Email:           appointment.Email,
-		RequestedDate:   appointment.RequestedDate,
-		RequestedTime:   appointment.RequestedTime,
-		AppointmentType: &appointment.AppointmentType,
-		Description:     appointment.Description,
-		IsEmergency:     appointment.IsEmergency,
-		PracticeID:      appointment.PracticeID,
-		Token:           appointment.Token,
-	})
+	c.JSON(http.StatusOK, appointmentResponse(appointment))
 }
 
 func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
 	if user.PracticeId == nil {
 		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
@@ -251,56 +127,31 @@ func (s *Server) handlerAppointmentsUpdate(c *gin.Context) {
 	}
 	id, err := parseId(c, "id")
 	if err != nil {
-		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid appointment ID"})
 		return
 	}
-
-	var req UpdateAppointmentRequest
-
-	if err = c.ShouldBindJSON(&req); err != nil {
-		respondWithError(c, http.StatusBadRequest, "Could not decode request", err)
-		return
-	}
-	updatedAppt, err := s.DBQuery.UpdateAppointment(c, db.UpdateAppointmentParams{
-		ID:            id,
-		PracticeID:    *user.PracticeId,
-		ScheduledDate: req.ScheduledDate,
-		ScheduledTime: req.ScheduledTime,
-		IsScheduled:   &req.IsScheduled,
-		IsCancelled:   &req.IsCancelled,
-	})
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
-		return
-	}
+	input, err := decodePatchAppointmentContacts(c.Request.Body)
 	if err != nil {
-		respondWithError(c, http.StatusInternalServerError, "Could not update appointment", err)
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusOK, Appointment{
-		ID:              updatedAppt.ID,
-		CreatedAt:       updatedAppt.CreatedAt,
-		ModifiedAt:      updatedAppt.ModifiedAt,
-		FirstName:       updatedAppt.FirstName,
-		LastName:        updatedAppt.LastName,
-		MobilePhone:     updatedAppt.MobilePhone,
-		Email:           updatedAppt.Email,
-		RequestedDate:   updatedAppt.RequestedDate,
-		RequestedTime:   updatedAppt.RequestedTime,
-		AppointmentType: &updatedAppt.AppointmentType,
-		Description:     updatedAppt.Description,
-		IsEmergency:     updatedAppt.IsEmergency,
-		PracticeID:      updatedAppt.PracticeID,
-		IsScheduled:     &updatedAppt.IsScheduled,
-		IsCancelled:     &updatedAppt.IsCancelled,
-		ScheduledDate:   updatedAppt.ScheduledDate,
-		ScheduledTime:   updatedAppt.ScheduledTime,
+	rows, err := s.DBQuery.PatchAppointmentContacts(c, db.PatchAppointmentContactsParams{
+		SetEmail: input.SetEmail, Email: input.Email, SetMobilePhone: input.SetMobilePhone,
+		MobilePhone: input.MobilePhone, ID: id, PracticeID: *user.PracticeId,
 	})
+	if err != nil {
+		respondTeamError(c, http.StatusInternalServerError, "Failed to update appointment", err)
+		return
+	}
+	if rows != 1 {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Appointment not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 func (s *Server) handlerAppointmentsDelete(c *gin.Context) {
+	setPrivateNoStore(c)
 	user := c.MustGet("user").(AuthUser)
 	if user.PracticeId == nil {
 		respondWithError(c, http.StatusForbidden, "Practice membership required", nil)
@@ -311,11 +162,7 @@ func (s *Server) handlerAppointmentsDelete(c *gin.Context) {
 		respondWithError(c, http.StatusBadRequest, "Invalid or missing ID", err)
 		return
 	}
-
-	deletedAppt, err := s.DBQuery.DeleteAppointment(c, db.DeleteAppointmentParams{
-		ID:         id,
-		PracticeID: *user.PracticeId,
-	})
+	deletedID, err := s.DBQuery.DeleteAppointment(c, db.DeleteAppointmentParams{ID: id, PracticeID: *user.PracticeId})
 	if errors.Is(err, pgx.ErrNoRows) {
 		respondWithError(c, http.StatusNotFound, "Appointment not found", nil)
 		return
@@ -324,6 +171,71 @@ func (s *Server) handlerAppointmentsDelete(c *gin.Context) {
 		respondWithError(c, http.StatusInternalServerError, "Could not delete appointment", err)
 		return
 	}
+	c.JSON(http.StatusOK, fmt.Sprintf("Successfully deleted appointment with id: %v", deletedID))
+}
 
-	c.JSON(http.StatusOK, fmt.Sprintf("Successfully deleted appointment with id: %v", deletedAppt))
+func decodePatchAppointmentContacts(body io.Reader) (patchAppointmentContactsInput, error) {
+	var fields map[string]json.RawMessage
+	decoder := json.NewDecoder(body)
+	if err := decoder.Decode(&fields); err != nil || fields == nil || ensureJSONEnd(decoder) != nil {
+		return patchAppointmentContactsInput{}, errors.New("Invalid request body")
+	}
+	var input patchAppointmentContactsInput
+	if raw, ok := fields["email"]; ok {
+		if json.Unmarshal(raw, &input.Email) == nil {
+			input.SetEmail, input.Email = true, strings.TrimSpace(input.Email)
+		}
+	}
+	if raw, ok := fields["mobile_phone"]; ok {
+		if json.Unmarshal(raw, &input.MobilePhone) == nil {
+			input.SetMobilePhone, input.MobilePhone = true, strings.TrimSpace(input.MobilePhone)
+		}
+	}
+	if !input.SetEmail && !input.SetMobilePhone {
+		return input, errors.New("No valid fields to update")
+	}
+	return input, nil
+}
+
+func parseAppointmentDateRange(c *gin.Context) (time.Time, time.Time, bool) {
+	startValue, endValue := c.Query("start"), c.Query("end")
+	if startValue == "" || endValue == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing start or end date parameter"})
+		return time.Time{}, time.Time{}, false
+	}
+	start, err := time.Parse("2006-01-02", startValue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start or end date parameter"})
+		return time.Time{}, time.Time{}, false
+	}
+	end, err := time.Parse("2006-01-02", endValue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start or end date parameter"})
+		return time.Time{}, time.Time{}, false
+	}
+	return start, end, true
+}
+
+func appointmentResponse(appointment db.Appointment) appointmentDTO {
+	return appointmentDTO{
+		ID: appointment.ID, CreatedAt: appointment.CreatedAt, ModifiedAt: appointment.ModifiedAt,
+		FirstName: appointment.FirstName, LastName: appointment.LastName, Email: appointment.Email,
+		MobilePhone: appointment.MobilePhone, RequestedDate: dateString(appointment.RequestedDate),
+		RequestedTime: appointment.RequestedTime, IsEmergency: appointment.IsEmergency,
+		Description: appointment.Description, AppointmentType: appointment.AppointmentType,
+		IsScheduled: appointment.IsScheduled, ScheduledDate: dateString(appointment.ScheduledDate),
+		ScheduledTime: appointment.ScheduledTime, IsCancelled: appointment.IsCancelled,
+		IsConfirmed: appointment.IsConfirmed, DurationMinutes: appointment.DurationMinutes,
+		CreatedBy: appointment.CreatedBy, ScheduledBy: appointment.ScheduledBy,
+		PracticeID: appointment.PracticeID, ProviderID: appointment.ProviderID,
+		LocationID: appointment.LocationID, PatientID: appointment.PatientID, DeletedAt: appointment.DeletedAt,
+	}
+}
+
+func dateString(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.Format("2006-01-02")
+	return &formatted
 }

@@ -22,6 +22,8 @@ type Server struct {
 	registrationNotify RegistrationNotifier
 	teamInviteNotify   TeamInviteNotifier
 	identityProfiles   IdentityProfileService
+	appointmentNotify  AppointmentNotifier
+	appointmentEvents  AppointmentEventService
 	patientBaseURL     string
 	inviteBaseURL      string
 }

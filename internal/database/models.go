@@ -19,11 +19,11 @@ type Appointment struct {
 	LastName        string
 	Email           string
 	MobilePhone     string
-	RequestedDate   time.Time
+	RequestedDate   *time.Time
 	RequestedTime   string
 	IsEmergency     bool
 	Description     *string
-	AppointmentType string
+	AppointmentType *string
 	IsScheduled     bool
 	ScheduledDate   *time.Time
 	ScheduledTime   *string
@@ -35,7 +35,7 @@ type Appointment struct {
 	ProviderID      *uuid.UUID
 	LocationID      *uuid.UUID
 	PatientID       *uuid.UUID
-	Token           string
+	Token           *string
 	DeletedAt       *time.Time
 	IsConfirmed     bool
 }

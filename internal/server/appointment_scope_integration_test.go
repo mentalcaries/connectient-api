@@ -102,7 +102,7 @@ func TestAppointmentDetailDeleteScope(t *testing.T) {
 						t.Error("other practice's appointment changed")
 					}
 					if tc.status == http.StatusOK && method == http.MethodGet {
-						var appointment Appointment
+						var appointment appointmentDTO
 						if err := json.Unmarshal(response.Body.Bytes(), &appointment); err != nil {
 							t.Fatal(err)
 						}
