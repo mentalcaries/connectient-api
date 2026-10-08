@@ -46,7 +46,7 @@ func TestOnboardingTransaction(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			t.Cleanup(cancel)
-			pool := newRegistrationTestPool(t, ctx, config)
+			pool := newOnboardingTestPool(t, ctx, config)
 			if tc.failureSQL != "" {
 				if _, err := pool.Exec(ctx, tc.failureSQL); err != nil {
 					t.Fatalf("inject database failure: %v", err)
@@ -69,7 +69,7 @@ func TestOnboardingTransaction(t *testing.T) {
 func TestOnboardingValidationAndConflicts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(cancel)
-	pool := newRegistrationTestPool(t, ctx, registrationTestConfig(t))
+	pool := newOnboardingTestPool(t, ctx, registrationTestConfig(t))
 	identity := uuid.New()
 	body := onboardingFixtureBody("contract-practice", "+15555550101")
 	body["termsAgreed"] = false
@@ -157,6 +157,13 @@ func newRegistrationTestPool(t *testing.T, ctx context.Context, config *pgxpool.
 	return pool
 }
 
+func newOnboardingTestPool(t *testing.T, ctx context.Context, config *pgxpool.Config) *pgxpool.Pool {
+	t.Helper()
+	pool := newRegistrationTestPool(t, ctx, config)
+	applyTestSchemas(t, ctx, pool, "006_provider.sql", "009_practice_provider.sql", "025_provider_ownership.sql")
+	return pool
+}
+
 func serveOnboarding(t *testing.T, ctx context.Context, pool *pgxpool.Pool, identity uuid.UUID, code string) *httptest.ResponseRecorder {
 	t.Helper()
 	return serveOnboardingBody(t, ctx, pool, identity, onboardingFixtureBody(code, "+15555550100"))
@@ -206,6 +213,8 @@ func assertOnboardingCounts(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 		{"practices", 1},
 		{"practice_settings", 1},
 		{"procedure_types", 5},
+		{"provider", 1},
+		{"practice_provider", 1},
 		{"subscription", 1},
 	} {
 		table, expected := record.table, record.count
@@ -239,8 +248,11 @@ func assertOnboardingCommitted(t *testing.T, ctx context.Context, pool *pgxpool.
 	err := pool.QueryRow(ctx, `SELECT EXISTS (
 		SELECT 1 FROM users u JOIN practices p ON p.id = u.practice_id
 		JOIN practice_settings settings ON settings.practice_id = p.id
+		JOIN practice_provider pp ON pp.practice_id = p.id AND pp.is_main
+		JOIN provider provider ON provider.id = pp.provider_id
 		JOIN subscription s ON s."referenceId" = p.id::text
 		WHERE u.id = $1 AND p.id = $2 AND u.role = 'owner' AND p.email = 'fixture@example.test'
+		AND provider.first_name = u.first_name AND provider.last_name = u.last_name
 		AND settings.dental_history_enabled AND s.plan = 'pro' AND s.status = 'trialing'
 		AND s."trialEnd" - s."trialStart" BETWEEN interval '29 days' AND interval '31 days'
 	)`, identity, payload.PracticeID).Scan(&linked)
@@ -249,5 +261,126 @@ func assertOnboardingCommitted(t *testing.T, ctx context.Context, pool *pgxpool.
 	}
 	if !linked {
 		t.Error("committed onboarding records are not correctly linked")
+	}
+}
+
+func TestOnboardingManagerMustSupplyMainProvider(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	t.Cleanup(cancel)
+	pool := newOnboardingTestPool(t, ctx, registrationTestConfig(t))
+	body := onboardingFixtureBody("manager-practice", "+15555550103")
+	body["is_solo_provider"] = false
+	body["registrant_is_provider"] = false
+
+	response := serveOnboardingBody(t, ctx, pool, uuid.New(), body)
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "Main provider details are required") {
+		t.Fatalf("missing provider response = %d %s", response.Code, response.Body.String())
+	}
+	assertOnboardingCounts(t, ctx, pool, false)
+
+	body["main_provider"] = map[string]any{
+		"first_name": "Alex", "last_name": "Clinician", "title": "Dr.", "specialty": "Rheumatology",
+	}
+	response = serveOnboardingBody(t, ctx, pool, uuid.New(), body)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("manager onboarding response = %d %s", response.Code, response.Body.String())
+	}
+	var provider struct {
+		FirstName string
+		LastName  string
+		IsMain    bool
+	}
+	if err := pool.QueryRow(ctx, `SELECT p.first_name, p.last_name, pp.is_main
+		FROM provider p JOIN practice_provider pp ON pp.provider_id = p.id`).Scan(
+		&provider.FirstName, &provider.LastName, &provider.IsMain,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if provider.FirstName != "Alex" || provider.LastName != "Clinician" || !provider.IsMain {
+		t.Fatalf("unexpected manager provider: %+v", provider)
+	}
+}
+
+func TestSingleProviderOwnerBackfill(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	t.Cleanup(cancel)
+	pool := newOnboardingTestPool(t, ctx, registrationTestConfig(t))
+
+	singleID, multiID, inactiveID, existingID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	for _, practice := range []struct {
+		id       uuid.UUID
+		code     string
+		multiple bool
+	}{
+		{singleID, "single-backfill", false},
+		{multiID, "multi-backfill", true},
+		{inactiveID, "inactive-backfill", false},
+		{existingID, "existing-backfill", false},
+	} {
+		if _, err := pool.Exec(ctx, `INSERT INTO practices
+			(id, name, city, practice_code, practice_category, specialty, has_multiple_providers)
+			VALUES ($1, 'Backfill Practice', 'Test City', $2, 'medical', 'Cardiology', $3)`,
+			practice.id, practice.code, practice.multiple,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, owner := range []struct {
+		id         uuid.UUID
+		practiceID uuid.UUID
+		active     bool
+	}{
+		{uuid.New(), singleID, true},
+		{uuid.New(), multiID, true},
+		{uuid.New(), inactiveID, false},
+		{uuid.New(), existingID, true},
+	} {
+		if _, err := pool.Exec(ctx, `INSERT INTO users
+			(id, first_name, last_name, email, practice_id, role, is_active)
+			VALUES ($1, 'Practice', 'Owner', $2, $3, 'owner', $4)`,
+			owner.id, owner.id.String()+"@example.test", owner.practiceID, owner.active,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	existingProviderID := uuid.New()
+	if _, err := pool.Exec(ctx, `INSERT INTO provider (id, first_name, last_name) VALUES ($1, 'Existing', 'Provider')`, existingProviderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO practice_provider (practice_id, provider_id, is_main) VALUES ($1, $2, TRUE)`, existingID, existingProviderID); err != nil {
+		t.Fatal(err)
+	}
+
+	applyTestSchemas(t, ctx, pool, "035_backfill_single_provider_owners.sql")
+
+	var firstName, lastName, specialty string
+	var isMain bool
+	if err := pool.QueryRow(ctx, `SELECT provider.first_name, provider.last_name, provider.specialty, link.is_main
+		FROM practice_provider AS link
+		JOIN provider ON provider.id = link.provider_id
+		WHERE link.practice_id = $1`, singleID).Scan(&firstName, &lastName, &specialty, &isMain); err != nil {
+		t.Fatal(err)
+	}
+	if firstName != "Practice" || lastName != "Owner" || specialty != "Cardiology" || !isMain {
+		t.Fatalf("unexpected backfilled provider: %s %s, %s, main=%t", firstName, lastName, specialty, isMain)
+	}
+
+	for _, practiceID := range []uuid.UUID{multiID, inactiveID} {
+		var count int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM practice_provider WHERE practice_id = $1`, practiceID).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Errorf("practice %s received %d unexpected provider links", practiceID, count)
+		}
+	}
+	var linkedProviderID uuid.UUID
+	if err := pool.QueryRow(ctx, `SELECT provider_id FROM practice_provider WHERE practice_id = $1`, existingID).Scan(&linkedProviderID); err != nil {
+		t.Fatal(err)
+	}
+	if linkedProviderID != existingProviderID {
+		t.Fatalf("existing provider link changed from %s to %s", existingProviderID, linkedProviderID)
 	}
 }

@@ -24,9 +24,10 @@ func TestProvidersIntegration(t *testing.T) {
 	pool := newRegistrationTestPool(t, ctx, registrationTestConfig(t))
 	applyTestSchemas(t, ctx, pool, "006_provider.sql", "009_practice_provider.sql", "025_provider_ownership.sql")
 
-	practiceID, otherPracticeID, failurePracticeID := uuid.New(), uuid.New(), uuid.New()
+	practiceID, otherPracticeID, emptyPracticeID, failurePracticeID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	for id, code := range map[uuid.UUID]string{
-		practiceID: "provider-practice", otherPracticeID: "other-provider-practice", failurePracticeID: "failure-provider-practice",
+		practiceID: "provider-practice", otherPracticeID: "other-provider-practice",
+		emptyPracticeID: "empty-provider-practice", failurePracticeID: "failure-provider-practice",
 	} {
 		if _, err := pool.Exec(ctx, `INSERT INTO practices (id, name, city, practice_code, practice_category)
 			VALUES ($1, 'Provider Practice', 'Test City', $2, 'dental')`, id, code); err != nil {
@@ -39,6 +40,18 @@ func TestProvidersIntegration(t *testing.T) {
 
 	s := &Server{db: registrationTestDB{pool}, DBQuery: db.New(pool)}
 	owner, admin, staff := "owner", "admin", "staff"
+	firstResponse := requestProviders(ctx, s, http.MethodPost, "/practices/providers", AuthUser{PracticeId: &emptyPracticeID, Role: &owner}, map[string]any{
+		"first_name": "First", "last_name": "Provider", "is_main": false,
+	}, true)
+	var firstCreated struct {
+		Data ProviderResponse `json:"data"`
+	}
+	decodeResponse(t, firstResponse, &firstCreated)
+	if firstResponse.Code != http.StatusCreated || !firstCreated.Data.IsMain {
+		t.Fatalf("first provider should become main: status=%d data=%+v", firstResponse.Code, firstCreated.Data)
+	}
+	assertMainProvider(t, ctx, pool, emptyPracticeID, firstCreated.Data.ID)
+
 	response := requestProviders(ctx, s, http.MethodGet, "/practices/providers", AuthUser{PracticeId: &practiceID, Role: &staff}, nil, false)
 	var list struct {
 		Data []ProviderResponse `json:"data"`

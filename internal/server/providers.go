@@ -74,6 +74,12 @@ func (s *Server) handlerCreatePracticeProvider(c *gin.Context) {
 		respondProviderError(c, http.StatusInternalServerError, "Failed to create provider", err)
 		return
 	}
+	existingProviders, err := queries.GetProvidersByPracticeID(c, *user.PracticeId)
+	if err != nil {
+		respondProviderError(c, http.StatusInternalServerError, "Failed to create provider", err)
+		return
+	}
+	isMain := input.IsMain || len(existingProviders) == 0
 	provider, err := queries.CreateProvider(c, db.CreateProviderParams{
 		FirstName: input.FirstName, LastName: input.LastName,
 		Title: input.Title, Specialty: input.Specialty,
@@ -82,14 +88,14 @@ func (s *Server) handlerCreatePracticeProvider(c *gin.Context) {
 		respondProviderError(c, http.StatusInternalServerError, "Failed to create provider", err)
 		return
 	}
-	if input.IsMain {
+	if isMain {
 		if err := queries.ClearMainProvider(c, *user.PracticeId); err != nil {
 			respondProviderError(c, http.StatusInternalServerError, "Failed to create provider", err)
 			return
 		}
 	}
 	if _, err := queries.CreatePracticeProviderLink(c, db.CreatePracticeProviderLinkParams{
-		PracticeID: *user.PracticeId, ProviderID: provider.ID, IsMain: input.IsMain,
+		PracticeID: *user.PracticeId, ProviderID: provider.ID, IsMain: isMain,
 	}); err != nil {
 		respondProviderError(c, http.StatusInternalServerError, "Failed to create provider", err)
 		return
@@ -100,7 +106,7 @@ func (s *Server) handlerCreatePracticeProvider(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": providerResponse(
 		provider.ID, provider.CreatedAt, provider.FirstName, provider.LastName,
-		provider.Title, provider.Specialty, input.IsMain,
+		provider.Title, provider.Specialty, isMain,
 	)})
 }
 

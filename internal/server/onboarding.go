@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,16 +16,25 @@ import (
 )
 
 type OnboardingCompletionRequest struct {
-	IsSoloProvider   bool    `json:"is_solo_provider"`
-	Name             string  `json:"name"`
-	PracticeCategory string  `json:"practice_category"`
-	Specialty        *string `json:"specialty"`
-	PracticeCode     string  `json:"practice_code"`
-	City             string  `json:"city"`
-	FirstName        string  `json:"first_name"`
-	LastName         string  `json:"last_name"`
-	MobilePhone      string  `json:"mobile_phone"`
-	TermsAgreed      bool    `json:"termsAgreed"`
+	IsSoloProvider       bool                    `json:"is_solo_provider"`
+	RegistrantIsProvider bool                    `json:"registrant_is_provider"`
+	MainProvider         *OnboardingMainProvider `json:"main_provider"`
+	Name                 string                  `json:"name"`
+	PracticeCategory     string                  `json:"practice_category"`
+	Specialty            *string                 `json:"specialty"`
+	PracticeCode         string                  `json:"practice_code"`
+	City                 string                  `json:"city"`
+	FirstName            string                  `json:"first_name"`
+	LastName             string                  `json:"last_name"`
+	MobilePhone          string                  `json:"mobile_phone"`
+	TermsAgreed          bool                    `json:"termsAgreed"`
+}
+
+type OnboardingMainProvider struct {
+	FirstName string  `json:"first_name"`
+	LastName  string  `json:"last_name"`
+	Title     *string `json:"title"`
+	Specialty *string `json:"specialty"`
 }
 
 func (s *Server) handlerCompleteOnboarding(c *gin.Context) {
@@ -52,6 +62,11 @@ func (s *Server) handlerCompleteOnboarding(c *gin.Context) {
 	}
 	if _, ok := DefaultSettingsByCategory[req.PracticeCategory]; !ok {
 		respondOnboardingError(c, http.StatusBadRequest, "Invalid practice category", nil)
+		return
+	}
+	mainProvider, err := onboardingMainProvider(req)
+	if err != nil {
+		respondOnboardingError(c, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
@@ -120,6 +135,20 @@ func (s *Server) handlerCompleteOnboarding(c *gin.Context) {
 		return
 	}
 
+	provider, err := queries.CreateProvider(c, mainProvider)
+	if err != nil {
+		respondOnboardingError(c, http.StatusInternalServerError, "Failed to create main provider", err)
+		return
+	}
+	if _, err := queries.CreatePracticeProviderLink(c, db.CreatePracticeProviderLinkParams{
+		PracticeID: createdPractice.ID,
+		ProviderID: provider.ID,
+		IsMain:     true,
+	}); err != nil {
+		respondOnboardingError(c, http.StatusInternalServerError, "Failed to link main provider", err)
+		return
+	}
+
 	defaultSettings := DefaultSettingsByCategory[createdPractice.PracticeCategory]
 	defaultProcedures := DefaultProcedureTypes[createdPractice.PracticeCategory]
 
@@ -177,6 +206,39 @@ func (s *Server) handlerCompleteOnboarding(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true, "practice_id": createdPractice.ID, "redirect_to": "/admin/dashboard",
 	})
+}
+
+func onboardingMainProvider(req OnboardingCompletionRequest) (db.CreateProviderParams, error) {
+	firstName, lastName := strings.TrimSpace(req.FirstName), strings.TrimSpace(req.LastName)
+	var title *string
+	specialty := "General"
+	if req.Specialty != nil && strings.TrimSpace(*req.Specialty) != "" {
+		specialty = strings.TrimSpace(*req.Specialty)
+	}
+
+	if !req.IsSoloProvider && !req.RegistrantIsProvider {
+		if req.MainProvider == nil {
+			return db.CreateProviderParams{}, errors.New("Main provider details are required")
+		}
+		firstName = strings.TrimSpace(req.MainProvider.FirstName)
+		lastName = strings.TrimSpace(req.MainProvider.LastName)
+		if req.MainProvider.Title != nil && strings.TrimSpace(*req.MainProvider.Title) != "" {
+			value := strings.TrimSpace(*req.MainProvider.Title)
+			title = &value
+		}
+		if req.MainProvider.Specialty != nil && strings.TrimSpace(*req.MainProvider.Specialty) != "" {
+			specialty = strings.TrimSpace(*req.MainProvider.Specialty)
+		}
+	}
+	if firstName == "" || lastName == "" {
+		return db.CreateProviderParams{}, errors.New("Main provider first name and last name are required")
+	}
+	return db.CreateProviderParams{
+		FirstName: firstName,
+		LastName:  lastName,
+		Title:     title,
+		Specialty: specialty,
+	}, nil
 }
 
 func respondOnboardingError(c *gin.Context, status int, message string, err error) {
