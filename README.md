@@ -57,9 +57,6 @@ GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=   # Registered callback URL ending in /connected-apps/google/callback
 ENCRYPTION_KEY=        # Base64-encoded 32-byte AES key for OAuth tokens
 SKIP_CALENDAR=         # true disables every Google Calendar network operation
-SUPABASE_URL=          # Supabase project URL for Realtime Broadcast
-SUPABASE_SECRET_KEY=   # Server-only Supabase secret (legacy service-role fallback supported)
-SKIP_REALTIME=         # true disables every Realtime Broadcast network operation
 ```
 
 ---

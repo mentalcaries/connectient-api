@@ -112,6 +112,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	authenticated.Use(s.AuthMiddleware())
 	{
 		authenticated.GET("/appointments", s.handlerGetAllAppointments)
+		authenticated.GET("/appointments/events", s.handlerAppointmentEvents)
 		authenticated.POST("/appointments", s.handlerCreateStaffAppointment)
 		authenticated.GET("/appointments/availability", s.handlerGetAppointmentAvailability)
 		authenticated.GET("/appointments/:id", s.handlerGetAppointmentById)

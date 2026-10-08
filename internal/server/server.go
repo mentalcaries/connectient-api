@@ -24,6 +24,7 @@ type Server struct {
 	identityProfiles    IdentityProfileService
 	appointmentNotify   AppointmentNotifier
 	appointmentEvents   AppointmentEventService
+	appointmentEventHub *appointmentEventHub
 	publicBookingNotify PublicAppointmentRequestNotifier
 	googleCalendar      *googleCalendarService
 	patientBaseURL      string
@@ -40,7 +41,7 @@ func NewServer() *http.Server {
 	queries := database.New(db.Pool())
 	notifications := newOutboundNotificationProvider(queries)
 	calendar := newGoogleCalendarService(db, queries)
-	realtime := newRealtimeAppointmentService()
+	eventHub := newAppointmentEventHub()
 
 	AppServer := &Server{
 		port:                port,
@@ -51,7 +52,8 @@ func NewServer() *http.Server {
 		teamInviteNotify:    notifications,
 		appointmentNotify:   notifications,
 		publicBookingNotify: notifications,
-		appointmentEvents:   &appointmentEventFanout{calendar: calendar, realtime: realtime},
+		appointmentEvents:   &appointmentEventFanout{calendar: calendar, hub: eventHub},
+		appointmentEventHub: eventHub,
 		googleCalendar:      calendar,
 		patientBaseURL:      strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
 		inviteBaseURL:       strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),

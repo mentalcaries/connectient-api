@@ -42,7 +42,8 @@ func (g *googleCalendarService) Disabled() bool {
 }
 
 func (g *googleCalendarService) BroadcastAppointmentChange(context.Context, uuid.UUID, string, uuid.UUID) error {
-	// PostgreSQL/Supabase Realtime observes the committed appointment row directly.
+	// Calendar-only test wiring has no invalidation transport. Production uses
+	// appointmentEventFanout to publish the same mutation to the SSE hub.
 	return nil
 }
 
