@@ -185,5 +185,10 @@ func (s *Server) handleReadiness(c *gin.Context) {
 }
 
 func (s *Server) healthHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, s.db.Health())
+	health := s.db.Health()
+	status := http.StatusOK
+	if health.Status != "up" {
+		status = http.StatusServiceUnavailable
+	}
+	c.JSON(status, gin.H{"status": health.Status})
 }
