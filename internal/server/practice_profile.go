@@ -27,7 +27,12 @@ const (
 	maxProfileRequestSize = maxLogoSize + 1024*1024
 )
 
-var practiceCodePattern = regexp.MustCompile(`^[a-z0-9-]+$`)
+var (
+	practiceCodePattern = regexp.MustCompile(`^[a-z0-9-]+$`)
+	urlSchemePattern    = regexp.MustCompile(`(?i)^[a-z][a-z\d+.-]*:`)
+	domainLabelPattern  = regexp.MustCompile(`(?i)^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$`)
+	topLevelDomain      = regexp.MustCompile(`(?i)^(?:[a-z]{2,63}|xn--[a-z\d-]{2,59})$`)
+)
 
 type PracticeProfileResponse struct {
 	ID                   uuid.UUID `json:"id"`
@@ -203,9 +208,11 @@ func decodePracticeProfile(request *http.Request) (practiceProfileInput, error) 
 	if err != nil || address.Address != input.Email {
 		return practiceProfileInput{}, errors.New("Please enter a valid email address")
 	}
-	if input.Website != "" && !validWebsite(input.Website) {
+	normalizedWebsite, err := normalizeWebsite(input.Website)
+	if err != nil {
 		return practiceProfileInput{}, errors.New("Please enter a valid website URL")
 	}
+	input.Website = normalizedWebsite
 	if message := validatePracticeCode(input.PracticeCode); message != "" {
 		return practiceProfileInput{}, errors.New(message)
 	}
@@ -264,9 +271,45 @@ func validatePracticeCode(code string) string {
 	}
 }
 
-func validWebsite(value string) bool {
-	parsed, err := url.ParseRequestURI(value)
-	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https")
+func normalizeWebsite(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	candidate := trimmed
+	if urlSchemePattern.MatchString(candidate) {
+		lower := strings.ToLower(candidate)
+		if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+			return "", errors.New("unsupported website scheme")
+		}
+	} else {
+		candidate = "https://" + candidate
+	}
+
+	parsed, err := url.Parse(candidate)
+	if err != nil || !validPublicWebsiteDomain(parsed.Hostname()) || parsed.User != nil {
+		return "", errors.New("invalid website URL")
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	parsed.Host = strings.ToLower(parsed.Host)
+	if parsed.Path == "/" && parsed.RawQuery == "" && parsed.Fragment == "" {
+		parsed.Path = ""
+	}
+	return parsed.String(), nil
+}
+
+func validPublicWebsiteDomain(hostname string) bool {
+	if len(hostname) > 253 || !strings.Contains(hostname, ".") {
+		return false
+	}
+	labels := strings.Split(hostname, ".")
+	for _, label := range labels {
+		if !domainLabelPattern.MatchString(label) {
+			return false
+		}
+	}
+	return topLevelDomain.MatchString(labels[len(labels)-1])
 }
 
 func practiceProfileResponse(row db.GetPracticeProfileRow) PracticeProfileResponse {

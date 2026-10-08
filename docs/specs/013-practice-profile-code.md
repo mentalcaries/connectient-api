@@ -13,6 +13,14 @@ practice code; omitted optional text fields become empty strings; omitted
 email and website are validated, and practice code uses lowercase letters, digits,
 and hyphens with length 4–30. Reserved/taken codes return 409.
 
+Website input accepts an absolute HTTP(S) URL or a scheme-less hostname/path.
+Scheme-less values are normalized to HTTPS before persistence (for example,
+`dental.com` becomes `https://dental.com`). Explicit HTTP(S) values are preserved;
+other schemes and credential-bearing URLs are rejected. Public booking responses
+therefore expose an absolute URL suitable for a patient-facing link. Hostnames must
+be public domain names with at least one dot and a valid multi-character top-level
+domain; single-label hosts such as `pop` or `localhost` and IP addresses are rejected.
+
 ## Logo storage
 
 Production uses R2; Supabase Storage is retired. Go uses R2 for new logos with keys
@@ -39,6 +47,8 @@ scoping. No schema migration is expected.
   against the current Next.js profile/code routes and settings consumers.
 - `make test` and `make test-integration` passed against disposable local
   PostgreSQL and a fake object store.
+- Website normalization unit coverage and profile persistence integration coverage
+  verify scheme-less HTTPS normalization and unsafe-scheme rejection.
 - `go vet -tags=integration ./...`, gofmt, and diff checks passed.
 - No migration was required; Neon and external R2/Supabase services were not used by
   tests.

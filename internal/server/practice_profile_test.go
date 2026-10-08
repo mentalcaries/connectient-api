@@ -23,12 +23,33 @@ func TestValidatePracticeCode(t *testing.T) {
 	}
 }
 
-func TestValidWebsite(t *testing.T) {
-	if !validWebsite("https://example.test/path") || !validWebsite("http://example.test") {
-		t.Error("expected HTTP websites to be valid")
+func TestNormalizeWebsite(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		want  string
+	}{
+		{"dental.com", "https://dental.com"},
+		{"www.dental.com", "https://www.dental.com"},
+		{"https://dental.com", "https://dental.com"},
+		{"https://www.dental.com/", "https://www.dental.com"},
+		{"http://dental.com", "http://dental.com"},
+		{" dental.com/services ", "https://dental.com/services"},
+		{"", ""},
+	} {
+		got, err := normalizeWebsite(tc.input)
+		if err != nil || got != tc.want {
+			t.Errorf("normalizeWebsite(%q) = %q, %v; want %q", tc.input, got, err, tc.want)
+		}
 	}
-	if validWebsite("example.test") || validWebsite("javascript:alert(1)") {
-		t.Error("expected invalid website to be rejected")
+
+	for _, input := range []string{
+		"pop", "localhost", "127.0.0.1", "dental.c", "-dental.com", "dental..com",
+		"javascript:alert(1)", "data:text/html,test", "ftp://dental.com",
+		"https://user:password@dental.com", "https://",
+	} {
+		if got, err := normalizeWebsite(input); err == nil {
+			t.Errorf("normalizeWebsite(%q) = %q; want error", input, got)
+		}
 	}
 }
 

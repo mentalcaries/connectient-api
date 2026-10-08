@@ -64,19 +64,21 @@ func TestPracticeProfileIntegration(t *testing.T) {
 			}
 		}
 	}
-	response = requestPracticeProfilePatch(ctx, s, AuthUser{PracticeId: &practiceID, Role: &owner}, validProfileFields("updated-profile-code"), png)
+	uploadFields := validProfileFields("updated-profile-code")
+	uploadFields["website"] = "dental.com"
+	response = requestPracticeProfilePatch(ctx, s, AuthUser{PracticeId: &practiceID, Role: &owner}, uploadFields, png)
 	if response.Code != http.StatusOK {
 		t.Fatalf("profile upload response = %d %s", response.Code, response.Body.String())
 	}
 	var currentLogo *string
-	var name, streetAddress string
+	var name, streetAddress, website string
 	var multiple bool
-	if err := pool.QueryRow(ctx, `SELECT name, street_address, has_multiple_providers, logo FROM practices WHERE id = $1`, practiceID).
-		Scan(&name, &streetAddress, &multiple, &currentLogo); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT name, street_address, website, has_multiple_providers, logo FROM practices WHERE id = $1`, practiceID).
+		Scan(&name, &streetAddress, &website, &multiple, &currentLogo); err != nil {
 		t.Fatal(err)
 	}
-	if name != "Updated Practice" || streetAddress != "" || !multiple || currentLogo == nil || *currentLogo == oldLogo {
-		t.Errorf("unexpected profile persistence: name=%q street=%q multiple=%t logo=%v", name, streetAddress, multiple, currentLogo)
+	if name != "Updated Practice" || streetAddress != "" || website != "https://dental.com" || !multiple || currentLogo == nil || *currentLogo == oldLogo {
+		t.Errorf("unexpected profile persistence: name=%q street=%q website=%q multiple=%t logo=%v", name, streetAddress, website, multiple, currentLogo)
 	}
 	if _, exists := storage.objects[practiceID.String()+"/logo_old"]; exists {
 		t.Error("old owned logo was not deleted")
