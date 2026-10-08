@@ -58,7 +58,7 @@ func (q *Queries) CreatePracticeSettings(ctx context.Context, arg CreatePractice
 }
 
 const getPracticeSettings = `-- name: GetPracticeSettings :one
-SELECT id, created_at, updated_at, practice_id, dental_history_enabled, tmj_history_enabled, multiple_locations_enabled, optometry_history_enabled, physiotherapy_history_enabled, custom_form_sections, theme, theme_colors FROM practice_settings
+SELECT id, created_at, updated_at, practice_id, dental_history_enabled, tmj_history_enabled, multiple_locations_enabled, optometry_history_enabled, physiotherapy_history_enabled, custom_form_sections, theme, theme_colors, available_weekdays FROM practice_settings
 WHERE practice_id = $1
 `
 
@@ -78,8 +78,100 @@ func (q *Queries) GetPracticeSettings(ctx context.Context, practiceID uuid.UUID)
 		&i.CustomFormSections,
 		&i.Theme,
 		&i.ThemeColors,
+		&i.AvailableWeekdays,
 	)
 	return i, err
+}
+
+const patchPracticeSettings = `-- name: PatchPracticeSettings :execrows
+UPDATE practice_settings
+SET
+    dental_history_enabled = CASE
+        WHEN $1::boolean THEN $2::boolean
+        ELSE dental_history_enabled
+    END,
+    tmj_history_enabled = CASE
+        WHEN $3::boolean THEN $4::boolean
+        ELSE tmj_history_enabled
+    END,
+    multiple_locations_enabled = CASE
+        WHEN $5::boolean THEN $6::boolean
+        ELSE multiple_locations_enabled
+    END,
+    available_weekdays = CASE
+        WHEN $7::boolean THEN $8::smallint[]
+        ELSE available_weekdays
+    END,
+    custom_form_sections = CASE
+        WHEN $9::boolean THEN $10::jsonb
+        ELSE custom_form_sections
+    END,
+    physiotherapy_history_enabled = CASE
+        WHEN $11::boolean THEN $12::boolean
+        ELSE physiotherapy_history_enabled
+    END,
+    optometry_history_enabled = CASE
+        WHEN $13::boolean THEN $14::boolean
+        ELSE optometry_history_enabled
+    END,
+    theme = CASE
+        WHEN $15::boolean THEN $16::text
+        ELSE theme
+    END,
+    theme_colors = CASE
+        WHEN $15::boolean THEN $17::jsonb
+        ELSE theme_colors
+    END,
+    updated_at = NOW()
+WHERE practice_id = $18
+`
+
+type PatchPracticeSettingsParams struct {
+	SetDentalHistoryEnabled        bool
+	DentalHistoryEnabled           bool
+	SetTmjHistoryEnabled           bool
+	TmjHistoryEnabled              bool
+	SetMultipleLocationsEnabled    bool
+	MultipleLocationsEnabled       bool
+	SetAvailableWeekdays           bool
+	AvailableWeekdays              []int16
+	SetCustomFormSections          bool
+	CustomFormSections             []byte
+	SetPhysiotherapyHistoryEnabled bool
+	PhysiotherapyHistoryEnabled    bool
+	SetOptometryHistoryEnabled     bool
+	OptometryHistoryEnabled        bool
+	SetTheme                       bool
+	Theme                          string
+	ThemeColors                    []byte
+	PracticeID                     uuid.UUID
+}
+
+func (q *Queries) PatchPracticeSettings(ctx context.Context, arg PatchPracticeSettingsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, patchPracticeSettings,
+		arg.SetDentalHistoryEnabled,
+		arg.DentalHistoryEnabled,
+		arg.SetTmjHistoryEnabled,
+		arg.TmjHistoryEnabled,
+		arg.SetMultipleLocationsEnabled,
+		arg.MultipleLocationsEnabled,
+		arg.SetAvailableWeekdays,
+		arg.AvailableWeekdays,
+		arg.SetCustomFormSections,
+		arg.CustomFormSections,
+		arg.SetPhysiotherapyHistoryEnabled,
+		arg.PhysiotherapyHistoryEnabled,
+		arg.SetOptometryHistoryEnabled,
+		arg.OptometryHistoryEnabled,
+		arg.SetTheme,
+		arg.Theme,
+		arg.ThemeColors,
+		arg.PracticeID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updatePracticeSettings = `-- name: UpdatePracticeSettings :exec

@@ -1,5 +1,10 @@
 # Appointment PATCH route and practice scope
 
+> Contract update: spec 028 replaces the historical scheduling-body PATCH with
+> the authoritative contact-only `{ email?, mobile_phone? }` contract. Scheduling
+> now uses transactional `POST /appointments/:id/schedule`. The tenant scoping and
+> zero-row behavior below remain applicable.
+
 Fix finding 3: register `PATCH /appointments/:id` and pass the authenticated
 membership's practice ID to the existing sqlc update query. Return 404 for
 `pgx.ErrNoRows` (missing, other-practice or soft-deleted appointment), and retain

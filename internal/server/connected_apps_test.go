@@ -95,12 +95,12 @@ func TestConnectedAppsResponse(t *testing.T) {
 			}}
 			s := &Server{DBQuery: db.New(store)}
 			router := gin.New()
-			router.GET("/practices/connected-apps", func(c *gin.Context) {
+			router.GET("/connected-apps", func(c *gin.Context) {
 				c.Set("user", AuthUser{PracticeId: &practiceID})
 				s.handlerGetConnectedApps(c)
 			})
 			response := httptest.NewRecorder()
-			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/practices/connected-apps", nil))
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/connected-apps", nil))
 			if response.Code != tc.status {
 				t.Errorf("status = %d, want %d", response.Code, tc.status)
 			}

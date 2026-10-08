@@ -1,5 +1,10 @@
 # Bind onboarding writes to one transaction
 
+> Contract update: spec 027 moves this transactional workflow from the historical
+> `POST /register` path to canonical `POST /onboarding/complete`, adopts the
+> `termsAgreed` request key and documented success envelope, and removes the old
+> alias. The transaction and rollback guarantees below remain applicable.
+
 ## Scope
 
 Fix `POST /register` so its existing user, practice, membership link, settings,
@@ -25,7 +30,7 @@ with a temporary cluster for verification. No Neon or Supabase data is involved.
 Run against an explicit disposable local test database:
 
 ```sh
-TEST_DATABASE_URL='postgres://postgres@127.0.0.1:PORT/connectient_test?sslmode=disable' go test -tags=integration ./internal/server -run '^TestRegistrationTransaction$' -count=1 -v
+TEST_DATABASE_URL='postgres://postgres@127.0.0.1:PORT/connectient_test?sslmode=disable' go test -tags=integration ./internal/server -run '^TestOnboardingTransaction$' -count=1 -v
 go vet -tags=integration ./internal/server
 ```
 

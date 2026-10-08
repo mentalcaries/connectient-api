@@ -26,3 +26,20 @@ func TestAppointmentPatchRoute(t *testing.T) {
 		t.Fatal("PATCH /appointments/:id is not registered")
 	}
 }
+
+func TestAppointmentCancellationRoute(t *testing.T) {
+	s := &Server{}
+	router := s.RegisterRoutes().(*gin.Engine)
+	found := false
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodDelete && route.Path == "/appointments/:id" {
+			t.Fatal("hard-delete appointment route must not be registered")
+		}
+		if route.Method == http.MethodPost && route.Path == "/appointments/:id/cancel" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("POST /appointments/:id/cancel is not registered")
+	}
+}

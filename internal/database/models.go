@@ -12,31 +12,33 @@ import (
 )
 
 type Appointment struct {
-	ID              uuid.UUID
-	CreatedAt       time.Time
-	ModifiedAt      time.Time
-	FirstName       string
-	LastName        string
-	Email           string
-	MobilePhone     string
-	RequestedDate   time.Time
-	RequestedTime   string
-	IsEmergency     bool
-	Description     *string
-	AppointmentType string
-	IsScheduled     bool
-	ScheduledDate   *time.Time
-	ScheduledTime   *string
-	IsCancelled     bool
-	DurationMinutes *int32
-	CreatedBy       *uuid.UUID
-	ScheduledBy     *uuid.UUID
-	PracticeID      uuid.UUID
-	ProviderID      *uuid.UUID
-	LocationID      *uuid.UUID
-	PatientID       *uuid.UUID
-	Token           string
-	DeletedAt       *time.Time
+	ID                uuid.UUID
+	CreatedAt         time.Time
+	ModifiedAt        time.Time
+	FirstName         string
+	LastName          string
+	Email             string
+	MobilePhone       string
+	RequestedDate     *time.Time
+	RequestedTime     string
+	IsEmergency       bool
+	Description       *string
+	AppointmentType   *string
+	IsScheduled       bool
+	ScheduledDate     *time.Time
+	ScheduledTime     *string
+	IsCancelled       bool
+	DurationMinutes   *int32
+	CreatedBy         *uuid.UUID
+	ScheduledBy       *uuid.UUID
+	PracticeID        uuid.UUID
+	ProviderID        *uuid.UUID
+	LocationID        *uuid.UUID
+	PatientID         *uuid.UUID
+	Token             *string
+	DeletedAt         *time.Time
+	IsConfirmed       bool
+	ScheduledTimezone string
 }
 
 type AppointmentCalendarEvent struct {
@@ -60,6 +62,24 @@ type ConnectedApp struct {
 	TokenExpiresAt        *time.Time
 	IsConnected           bool
 	LastError             *string
+	AppCalendarID         *string
+}
+
+type DataExportAuditLog struct {
+	ID               uuid.UUID
+	PracticeID       uuid.UUID
+	ExportedByUserID uuid.UUID
+	ExportType       string
+	RowCount         int32
+	ExportedAt       pgtype.Timestamptz
+}
+
+type GoogleOauthState struct {
+	State      string
+	PracticeID uuid.UUID
+	UserID     uuid.UUID
+	ExpiresAt  pgtype.Timestamptz
+	CreatedAt  pgtype.Timestamptz
 }
 
 type NotificationLog struct {
@@ -68,6 +88,17 @@ type NotificationLog struct {
 	PracticeID       uuid.UUID
 	Channel          string
 	NotificationType string
+}
+
+type OnboardingProgress struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	WalkthroughKey string
+	SeenAt         pgtype.Timestamptz
+	DismissedAt    pgtype.Timestamptz
+	CompletedAt    pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
 }
 
 type Patient struct {
@@ -98,7 +129,7 @@ type PatientRegistration struct {
 	AppointmentID  *uuid.UUID
 	PatientID      *uuid.UUID
 	PatientName    string
-	PatientEmail   string
+	PatientEmail   *string
 	Token          string
 	TokenExpiresAt time.Time
 	Status         string
@@ -106,6 +137,7 @@ type PatientRegistration struct {
 	SentAt         *time.Time
 	CompletedAt    *time.Time
 	DeletedAt      *time.Time
+	PatientPhone   *string
 }
 
 type PatientRegistrationDatum struct {
@@ -153,14 +185,15 @@ type PracticeInvite struct {
 }
 
 type PracticeLocation struct {
-	ID         uuid.UUID
-	CreatedAt  time.Time
-	DeletedAt  *time.Time
-	PracticeID uuid.UUID
-	Name       string
-	Address    string
-	IsActive   bool
-	SortOrder  int32
+	ID                uuid.UUID
+	CreatedAt         time.Time
+	DeletedAt         *time.Time
+	PracticeID        uuid.UUID
+	Name              string
+	Address           *string
+	IsActive          bool
+	SortOrder         int32
+	AvailableWeekdays []int16
 }
 
 type PracticeProvider struct {
@@ -184,6 +217,7 @@ type PracticeSetting struct {
 	CustomFormSections          []byte
 	Theme                       string
 	ThemeColors                 []byte
+	AvailableWeekdays           []int16
 }
 
 type ProcedureType struct {
@@ -206,6 +240,14 @@ type Provider struct {
 	LastName  string
 	Title     *string
 	Specialty string
+}
+
+type PublicAppointmentRequestIdempotency struct {
+	PracticeID     uuid.UUID
+	IdempotencyKey string
+	RequestHash    []byte
+	ResponseBody   []byte
+	CreatedAt      pgtype.Timestamptz
 }
 
 type Subscription struct {

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net/http"
 	"regexp"
 	"slices"
@@ -75,6 +77,7 @@ func (s *Server) practiceCodeExists(c *gin.Context, slug string) (bool, error) {
 }
 
 func (s *Server) handlerSuggestPracticeCode(c *gin.Context) {
+	setPrivateNoStore(c)
 	name := c.Query("name")
 	if strings.TrimSpace(name) == "" {
 		respondWithError(c, http.StatusBadRequest, "Name is required", nil)
@@ -82,6 +85,10 @@ func (s *Server) handlerSuggestPracticeCode(c *gin.Context) {
 	}
 
 	slug := generateSlug(name, false)
+	if len(slug) < 3 {
+		respondWithError(c, http.StatusBadRequest, "Generated code is too short", nil)
+		return
+	}
 	slug = truncateToSegments(slug, 3)
 
 	codeExists, err := s.practiceCodeExists(c, slug)
@@ -89,22 +96,32 @@ func (s *Server) handlerSuggestPracticeCode(c *gin.Context) {
 		respondWithError(c, http.StatusInternalServerError, "Unable to check existing code", err)
 		return
 	}
-	suffix := 2
-
-	for codeExists {
+	for suffix := 2; codeExists && suffix <= 99; suffix++ {
 		updatedSlug := fmt.Sprintf("%s-%d", slug, suffix)
 		codeExists, err = s.practiceCodeExists(c, updatedSlug)
+		if err != nil {
+			respondWithError(c, http.StatusInternalServerError, "Unable to check existing code", err)
+			return
+		}
 		if codeExists {
-			suffix++
+			continue
 		} else {
 			slug = updatedSlug
 		}
 	}
+	if codeExists {
+		randomSuffix, err := rand.Int(rand.Reader, big.NewInt(1000))
+		if err != nil {
+			respondWithError(c, http.StatusInternalServerError, "Unable to generate code", err)
+			return
+		}
+		slug = fmt.Sprintf("%s-%d", slug, randomSuffix.Int64())
+	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "suggestion": slug})
 }
 
-
 func (s *Server) handlerCheckCodeAvailability(c *gin.Context) {
+	setPrivateNoStore(c)
 	code := c.Query("code")
 	if strings.TrimSpace(code) == "" {
 		respondWithError(c, http.StatusBadRequest, "Code is required", nil)
@@ -113,7 +130,7 @@ func (s *Server) handlerCheckCodeAvailability(c *gin.Context) {
 
 	sanitizedCode := generateSlug(code, true)
 	if len(sanitizedCode) < 3 {
-		respondWithError(c, http.StatusBadRequest, "Code must be at least 3 characters", nil)
+		respondWithError(c, http.StatusBadRequest, "Code must be at least 3 characters after sanitization", nil)
 		return
 	}
 

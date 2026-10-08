@@ -1,11 +1,13 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type User struct {
@@ -117,8 +119,12 @@ func (s *Server) handlerGetCurrentUser(c *gin.Context) {
 	claims := c.MustGet("claims").(TokenClaims)
 
 	user, err := s.DBQuery.GetUserWithSubscriptionStatus(c, claims.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		respondWithError(c, http.StatusNotFound, "user not found", nil)
+		return
+	}
 	if err != nil {
-		respondWithError(c, http.StatusNotFound, "user not found", err)
+		respondWithError(c, http.StatusInternalServerError, "could not load user", err)
 		return
 	}
 
@@ -132,10 +138,10 @@ func (s *Server) handlerGetCurrentUser(c *gin.Context) {
 		IsActive:    &user.IsActive,
 		DeletedAt:   user.DeletedAt,
 		Status:      user.SubscriptionStatus,
-		TrialEnd:    &user.SubscriptionTrialEnd.Time,
-		PeriodEnd:   &user.SubscriptionPeriodEnd.Time,
+		TrialEnd:    nullableTimestamp(user.SubscriptionTrialEnd),
+		PeriodEnd:   nullableTimestamp(user.SubscriptionPeriodEnd),
 		AvatarURL:   user.AvatarUrl,
 		Plan:        user.SubscriptionPlan,
-		CancelAt:    &user.SubscriptionCancelAt.Time,
+		CancelAt:    nullableTimestamp(user.SubscriptionCancelAt),
 	})
 }

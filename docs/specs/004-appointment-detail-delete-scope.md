@@ -1,5 +1,9 @@
 # Practice-scoped appointment detail and deletion
 
+> Contract update: spec 030 removes hard deletion and introduces idempotent,
+> state-preserving `POST /appointments/:id/cancel`. Detail tenant scoping remains
+> applicable; historical DELETE behavior is no longer exposed.
+
 Fix finding 4: `GET /appointments/:id` and `DELETE /appointments/:id` must match
 both the path ID and the authenticated membership's practice ID in SQL. Bind those
 parameters through regenerated sqlc queries. Return 403 for missing practice,

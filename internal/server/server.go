@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -14,9 +15,20 @@ import (
 )
 
 type Server struct {
-	port    int
-	db      database.Service
-	DBQuery *database.Queries
+	port                int
+	db                  database.Service
+	DBQuery             *database.Queries
+	storage             ObjectStorage
+	registrationNotify  RegistrationNotifier
+	teamInviteNotify    TeamInviteNotifier
+	identityProfiles    IdentityProfileService
+	appointmentNotify   AppointmentNotifier
+	appointmentEvents   AppointmentEventService
+	appointmentEventHub *appointmentEventHub
+	publicBookingNotify PublicAppointmentRequestNotifier
+	googleCalendar      *googleCalendarService
+	patientBaseURL      string
+	inviteBaseURL       string
 }
 
 func NewServer() *http.Server {
@@ -26,11 +38,26 @@ func NewServer() *http.Server {
 	}
 
 	db := database.NewDb()
+	queries := database.New(db.Pool())
+	notifications := newOutboundNotificationProvider(queries)
+	calendar := newGoogleCalendarService(db, queries)
+	eventHub := newAppointmentEventHub()
 
 	AppServer := &Server{
-		port:    port,
-		db:      db,
-		DBQuery: database.New(db.Pool()),
+		port:                port,
+		db:                  db,
+		DBQuery:             queries,
+		storage:             newR2ObjectStorageFromEnv(),
+		registrationNotify:  notifications,
+		teamInviteNotify:    notifications,
+		appointmentNotify:   notifications,
+		publicBookingNotify: notifications,
+		appointmentEvents:   &appointmentEventFanout{calendar: calendar, hub: eventHub},
+		appointmentEventHub: eventHub,
+		googleCalendar:      calendar,
+		patientBaseURL:      strings.TrimRight(os.Getenv("PATIENT_URL"), "/"),
+		inviteBaseURL:       strings.TrimRight(os.Getenv("FRONTEND_BASE_URL"), "/"),
+		identityProfiles:    newHTTPIdentityProfileServiceFromEnv(),
 	}
 
 	server := &http.Server{

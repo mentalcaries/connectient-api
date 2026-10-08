@@ -35,6 +35,20 @@ them afterward; database-service tests check connection health and shutdown.
 Without `TEST_DATABASE_URL`, the integration command fails with setup instructions.
 No tests start the API or contact messaging/OAuth providers.
 
+## Cleaning up a test practice
+
+After migration 036 is applied, purge a disposable practice and all of its owned
+records with one database call:
+
+```sql
+SELECT purge_practice('00000000-0000-0000-0000-000000000000');
+```
+
+The function also removes the matching subscription and providers left unlinked by
+the cascade. It returns `true` when it deletes a practice and `false` when the UUID
+does not exist. Execution is restricted to the migration owner unless it is granted
+explicitly to another maintenance role.
+
 For one integration test (after exporting the variable):
 
 ```sh

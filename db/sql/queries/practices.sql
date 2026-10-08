@@ -11,6 +11,29 @@ WHERE p.id = sqlc.arg(id);
 SELECT * FROM practices
 WHERE practice_code = sqlc.arg(practice_code);
 
+-- name: GetPracticeSubscription :one
+SELECT
+    s.status,
+    s.plan,
+    s."trialEnd" AS trial_end,
+    s."periodEnd" AS period_end,
+    s."cancelAt" AS cancel_at
+FROM practices p
+LEFT JOIN subscription s ON s."referenceId" = p.id::text
+WHERE p.id = sqlc.arg(id);
+
+-- name: GetPracticeSettingsOverview :one
+SELECT id, name, practice_category, specialty, practice_code, city
+FROM practices
+WHERE id = sqlc.arg(id);
+
+-- name: GetPracticeProfile :one
+SELECT id, name, logo, city, street_address, phone, email, website,
+       practice_code, instagram, facebook, has_multiple_providers,
+       practice_category, specialty
+FROM practices
+WHERE id = sqlc.arg(id);
+
 -- name: CreatePractice :one
 INSERT INTO practices (name, city, phone, email, practice_code, logo, street_address, facebook, instagram, website, has_multiple_providers, specialty, is_suspended, practice_category)
 VALUES (
@@ -52,3 +75,48 @@ SET
     modified_at = NOW()
 WHERE id = sqlc.arg(id)
 RETURNING *;
+
+-- name: PatchPracticeSettingsPractice :execrows
+UPDATE practices
+SET
+    specialty = CASE
+        WHEN sqlc.arg(set_specialty)::boolean THEN sqlc.narg(specialty)::text
+        ELSE specialty
+    END,
+    has_multiple_providers = CASE
+        WHEN sqlc.arg(set_has_multiple_providers)::boolean THEN sqlc.arg(has_multiple_providers)::boolean
+        ELSE has_multiple_providers
+    END,
+    modified_at = NOW()
+WHERE id = sqlc.arg(id);
+
+-- name: UpdatePracticeProfile :execrows
+UPDATE practices
+SET
+    name = sqlc.arg(name),
+    street_address = sqlc.arg(street_address),
+    city = sqlc.arg(city),
+    phone = sqlc.arg(phone),
+    email = sqlc.arg(email),
+    website = sqlc.arg(website),
+    practice_code = sqlc.arg(practice_code),
+    facebook = sqlc.arg(facebook),
+    instagram = sqlc.arg(instagram),
+    specialty = sqlc.arg(specialty),
+    has_multiple_providers = sqlc.arg(has_multiple_providers),
+    logo = CASE
+        WHEN sqlc.arg(set_logo)::boolean THEN sqlc.narg(logo)::text
+        ELSE logo
+    END,
+    modified_at = NOW()
+WHERE id = sqlc.arg(id);
+
+-- name: UpdatePracticeCode :execrows
+UPDATE practices
+SET practice_code = sqlc.arg(practice_code), modified_at = NOW()
+WHERE id = sqlc.arg(id);
+
+-- name: UpdatePracticeLogo :execrows
+UPDATE practices
+SET logo = sqlc.narg(logo), modified_at = NOW()
+WHERE id = sqlc.arg(id);

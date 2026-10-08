@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createPractice = `-- name: CreatePractice :one
@@ -92,7 +93,7 @@ func (q *Queries) CreatePractice(ctx context.Context, arg CreatePracticeParams) 
 }
 
 const getPractice = `-- name: GetPractice :one
-SELECT p.id, p.created_at, p.modified_at, p.name, p.city, p.phone, p.email, p.practice_code, p.logo, p.street_address, p.facebook, p.instagram, p.website, p.has_multiple_providers, p.specialty, p.is_suspended, p.practice_category, p.is_active, s.id, s.created_at, s.updated_at, s.practice_id, s.dental_history_enabled, s.tmj_history_enabled, s.multiple_locations_enabled, s.optometry_history_enabled, s.physiotherapy_history_enabled, s.custom_form_sections, s.theme, s.theme_colors
+SELECT p.id, p.created_at, p.modified_at, p.name, p.city, p.phone, p.email, p.practice_code, p.logo, p.street_address, p.facebook, p.instagram, p.website, p.has_multiple_providers, p.specialty, p.is_suspended, p.practice_category, p.is_active, s.id, s.created_at, s.updated_at, s.practice_id, s.dental_history_enabled, s.tmj_history_enabled, s.multiple_locations_enabled, s.optometry_history_enabled, s.physiotherapy_history_enabled, s.custom_form_sections, s.theme, s.theme_colors, s.available_weekdays
 FROM practices p
 LEFT JOIN practice_settings s ON s.practice_id = p.id
 WHERE p.id = $1
@@ -129,6 +130,7 @@ type GetPracticeRow struct {
 	CustomFormSections          []byte
 	Theme                       *string
 	ThemeColors                 []byte
+	AvailableWeekdays           []int16
 }
 
 func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (GetPracticeRow, error) {
@@ -165,6 +167,7 @@ func (q *Queries) GetPractice(ctx context.Context, id uuid.UUID) (GetPracticeRow
 		&i.CustomFormSections,
 		&i.Theme,
 		&i.ThemeColors,
+		&i.AvailableWeekdays,
 	)
 	return i, err
 }
@@ -196,6 +199,115 @@ func (q *Queries) GetPracticeByCode(ctx context.Context, practiceCode string) (P
 		&i.IsSuspended,
 		&i.PracticeCategory,
 		&i.IsActive,
+	)
+	return i, err
+}
+
+const getPracticeProfile = `-- name: GetPracticeProfile :one
+SELECT id, name, logo, city, street_address, phone, email, website,
+       practice_code, instagram, facebook, has_multiple_providers,
+       practice_category, specialty
+FROM practices
+WHERE id = $1
+`
+
+type GetPracticeProfileRow struct {
+	ID                   uuid.UUID
+	Name                 string
+	Logo                 *string
+	City                 string
+	StreetAddress        *string
+	Phone                *string
+	Email                *string
+	Website              *string
+	PracticeCode         string
+	Instagram            *string
+	Facebook             *string
+	HasMultipleProviders bool
+	PracticeCategory     string
+	Specialty            *string
+}
+
+func (q *Queries) GetPracticeProfile(ctx context.Context, id uuid.UUID) (GetPracticeProfileRow, error) {
+	row := q.db.QueryRow(ctx, getPracticeProfile, id)
+	var i GetPracticeProfileRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Logo,
+		&i.City,
+		&i.StreetAddress,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.PracticeCode,
+		&i.Instagram,
+		&i.Facebook,
+		&i.HasMultipleProviders,
+		&i.PracticeCategory,
+		&i.Specialty,
+	)
+	return i, err
+}
+
+const getPracticeSettingsOverview = `-- name: GetPracticeSettingsOverview :one
+SELECT id, name, practice_category, specialty, practice_code, city
+FROM practices
+WHERE id = $1
+`
+
+type GetPracticeSettingsOverviewRow struct {
+	ID               uuid.UUID
+	Name             string
+	PracticeCategory string
+	Specialty        *string
+	PracticeCode     string
+	City             string
+}
+
+func (q *Queries) GetPracticeSettingsOverview(ctx context.Context, id uuid.UUID) (GetPracticeSettingsOverviewRow, error) {
+	row := q.db.QueryRow(ctx, getPracticeSettingsOverview, id)
+	var i GetPracticeSettingsOverviewRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PracticeCategory,
+		&i.Specialty,
+		&i.PracticeCode,
+		&i.City,
+	)
+	return i, err
+}
+
+const getPracticeSubscription = `-- name: GetPracticeSubscription :one
+SELECT
+    s.status,
+    s.plan,
+    s."trialEnd" AS trial_end,
+    s."periodEnd" AS period_end,
+    s."cancelAt" AS cancel_at
+FROM practices p
+LEFT JOIN subscription s ON s."referenceId" = p.id::text
+WHERE p.id = $1
+`
+
+type GetPracticeSubscriptionRow struct {
+	Status    *string
+	Plan      *string
+	TrialEnd  pgtype.Timestamptz
+	PeriodEnd pgtype.Timestamptz
+	CancelAt  pgtype.Timestamptz
+}
+
+func (q *Queries) GetPracticeSubscription(ctx context.Context, id uuid.UUID) (GetPracticeSubscriptionRow, error) {
+	row := q.db.QueryRow(ctx, getPracticeSubscription, id)
+	var i GetPracticeSubscriptionRow
+	err := row.Scan(
+		&i.Status,
+		&i.Plan,
+		&i.TrialEnd,
+		&i.PeriodEnd,
+		&i.CancelAt,
 	)
 	return i, err
 }
@@ -241,6 +353,43 @@ func (q *Queries) GetPractices(ctx context.Context) ([]Practice, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const patchPracticeSettingsPractice = `-- name: PatchPracticeSettingsPractice :execrows
+UPDATE practices
+SET
+    specialty = CASE
+        WHEN $1::boolean THEN $2::text
+        ELSE specialty
+    END,
+    has_multiple_providers = CASE
+        WHEN $3::boolean THEN $4::boolean
+        ELSE has_multiple_providers
+    END,
+    modified_at = NOW()
+WHERE id = $5
+`
+
+type PatchPracticeSettingsPracticeParams struct {
+	SetSpecialty            bool
+	Specialty               *string
+	SetHasMultipleProviders bool
+	HasMultipleProviders    bool
+	ID                      uuid.UUID
+}
+
+func (q *Queries) PatchPracticeSettingsPractice(ctx context.Context, arg PatchPracticeSettingsPracticeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, patchPracticeSettingsPractice,
+		arg.SetSpecialty,
+		arg.Specialty,
+		arg.SetHasMultipleProviders,
+		arg.HasMultipleProviders,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updatePractice = `-- name: UpdatePractice :one
@@ -326,4 +475,104 @@ func (q *Queries) UpdatePractice(ctx context.Context, arg UpdatePracticeParams) 
 		&i.IsActive,
 	)
 	return i, err
+}
+
+const updatePracticeCode = `-- name: UpdatePracticeCode :execrows
+UPDATE practices
+SET practice_code = $1, modified_at = NOW()
+WHERE id = $2
+`
+
+type UpdatePracticeCodeParams struct {
+	PracticeCode string
+	ID           uuid.UUID
+}
+
+func (q *Queries) UpdatePracticeCode(ctx context.Context, arg UpdatePracticeCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePracticeCode, arg.PracticeCode, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updatePracticeLogo = `-- name: UpdatePracticeLogo :execrows
+UPDATE practices
+SET logo = $1, modified_at = NOW()
+WHERE id = $2
+`
+
+type UpdatePracticeLogoParams struct {
+	Logo *string
+	ID   uuid.UUID
+}
+
+func (q *Queries) UpdatePracticeLogo(ctx context.Context, arg UpdatePracticeLogoParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePracticeLogo, arg.Logo, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updatePracticeProfile = `-- name: UpdatePracticeProfile :execrows
+UPDATE practices
+SET
+    name = $1,
+    street_address = $2,
+    city = $3,
+    phone = $4,
+    email = $5,
+    website = $6,
+    practice_code = $7,
+    facebook = $8,
+    instagram = $9,
+    specialty = $10,
+    has_multiple_providers = $11,
+    logo = CASE
+        WHEN $12::boolean THEN $13::text
+        ELSE logo
+    END,
+    modified_at = NOW()
+WHERE id = $14
+`
+
+type UpdatePracticeProfileParams struct {
+	Name                 string
+	StreetAddress        *string
+	City                 string
+	Phone                *string
+	Email                *string
+	Website              *string
+	PracticeCode         string
+	Facebook             *string
+	Instagram            *string
+	Specialty            *string
+	HasMultipleProviders bool
+	SetLogo              bool
+	Logo                 *string
+	ID                   uuid.UUID
+}
+
+func (q *Queries) UpdatePracticeProfile(ctx context.Context, arg UpdatePracticeProfileParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePracticeProfile,
+		arg.Name,
+		arg.StreetAddress,
+		arg.City,
+		arg.Phone,
+		arg.Email,
+		arg.Website,
+		arg.PracticeCode,
+		arg.Facebook,
+		arg.Instagram,
+		arg.Specialty,
+		arg.HasMultipleProviders,
+		arg.SetLogo,
+		arg.Logo,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
