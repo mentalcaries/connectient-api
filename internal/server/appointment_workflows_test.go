@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -45,6 +46,13 @@ func TestDecodeAppointmentSchedulingCommands(t *testing.T) {
 	}
 	if create.Patient.FirstName != "Jane" || create.AppointmentType != "Consultation" || !create.SendEmail || !create.SendWhatsApp || create.Timezone != "UTC" {
 		t.Errorf("unexpected create command: %+v", create)
+	}
+	if _, err := decodeCreateStaffAppointment(strings.NewReader(`{
+		"patient":{"kind":"new","firstName":"Missing","lastName":"Mobile"},
+		"appointmentType":"Consultation","scheduledDate":"2026-10-08","scheduledTime":"08:00",
+		"durationMinutes":30,"providerId":"` + providerID + `"
+	}`)); !errors.Is(err, errCompleteMobileNumberRequired) {
+		t.Fatalf("missing mobile error = %v", err)
 	}
 
 	for _, body := range []string{

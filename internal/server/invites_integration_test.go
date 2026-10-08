@@ -112,7 +112,7 @@ func TestInvitationsIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	response = requestInvite(ctx, s, http.MethodGet, "/invite/validate?token="+token, caller, nil)
-	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "Invite expired") {
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), `"reason":"expired"`) || !strings.Contains(response.Body.String(), "Invite expired") {
 		t.Errorf("expired validation = %d %s", response.Code, response.Body.String())
 	}
 	response = requestInvite(ctx, s, http.MethodDelete, "/users/invites/"+inviteID.String(), caller, nil)

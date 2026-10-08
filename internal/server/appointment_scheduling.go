@@ -170,6 +170,8 @@ type scheduleTransactionResult struct {
 	Conflicts   []availabilityConflict
 }
 
+var errCompleteMobileNumberRequired = errors.New("A complete mobile number is required")
+
 func decodeCreateStaffAppointment(body io.Reader) (createStaffAppointmentInput, error) {
 	var wire struct {
 		Patient                 json.RawMessage         `json:"patient"`
@@ -419,7 +421,7 @@ func validateOptionalEmail(value *string) (*string, error) {
 func validatePhone(value string) (string, error) {
 	trimmed := strings.TrimSpace(value)
 	if len(trimmed) < 7 || len(trimmed) > 30 {
-		return "", errors.New("A complete mobile number is required")
+		return "", errCompleteMobileNumberRequired
 	}
 	return trimmed, nil
 }

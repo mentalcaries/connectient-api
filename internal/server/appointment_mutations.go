@@ -43,6 +43,10 @@ func (s *Server) handlerCreateStaffAppointment(c *gin.Context) {
 	}
 	input, err := decodeCreateStaffAppointment(c.Request.Body)
 	if err != nil {
+		if errors.Is(err, errCompleteMobileNumberRequired) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errCompleteMobileNumberRequired.Error()})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid appointment details"})
 		return
 	}

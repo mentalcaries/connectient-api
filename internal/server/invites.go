@@ -180,12 +180,12 @@ func (s *Server) handlerValidateInvite(c *gin.Context) {
 		return
 	}
 	if _, err := uuid.Parse(token); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"valid": false, "error": "Invite not found"})
+		c.JSON(http.StatusNotFound, gin.H{"valid": false, "reason": "not_found", "error": "Invite not found"})
 		return
 	}
 	invite, err := s.DBQuery.GetInviteValidation(c, token)
 	if errors.Is(err, pgx.ErrNoRows) {
-		c.JSON(http.StatusNotFound, gin.H{"valid": false, "error": "Invite not found"})
+		c.JSON(http.StatusNotFound, gin.H{"valid": false, "reason": "not_found", "error": "Invite not found"})
 		return
 	}
 	if err != nil {
@@ -193,11 +193,11 @@ func (s *Server) handlerValidateInvite(c *gin.Context) {
 		return
 	}
 	if invite.AcceptedAt != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"valid": false, "error": "Invite already accepted"})
+		c.JSON(http.StatusBadRequest, gin.H{"valid": false, "reason": "already_accepted", "error": "Invite already accepted"})
 		return
 	}
 	if invite.TokenExpiresAt.Before(time.Now()) {
-		c.JSON(http.StatusBadRequest, gin.H{"valid": false, "error": "Invite expired"})
+		c.JSON(http.StatusBadRequest, gin.H{"valid": false, "reason": "expired", "error": "Invite expired"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"valid": true, "invite": gin.H{
