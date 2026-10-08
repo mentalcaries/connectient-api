@@ -160,6 +160,23 @@ Run unit tests (no database or Docker required):
 make test
 ```
 
+## Container deployment
+
+Build and run the production image locally:
+
+```bash
+docker build -t connectient-api .
+docker run --rm --env-file .env -p 4000:4000 connectient-api
+```
+
+Pushes to `main` publish `latest` and commit-SHA images to
+`ghcr.io/mentalcaries/connectient-api`. Runtime secrets and configuration belong
+in the deployment platform, not in the image or GitHub Actions.
+
+The container does not run database migrations. Apply the required Goose
+migrations explicitly before deploying a corresponding API version. Run one API
+replica until the in-memory SSE event hub is replaced with shared fan-out.
+
 Clean up binary from the last build:
 ```bash
 make clean
